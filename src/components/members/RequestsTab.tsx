@@ -17,12 +17,11 @@ export const RequestsTab = () => {
     if (!profile?.unit_id) return;
     setLoading(true);
     try {
-      // Fetch requests with Member and Target Unit details
+      // Fetch requests
       const { data, error } = await supabase
         .from('member_requests')
         .select(`
           *,
-          member:members (id, full_name, image_url),
           target_unit:units!member_requests_target_unit_id_fkey (id, name)
         `)
         .eq('unit_id', profile.unit_id)
@@ -48,18 +47,8 @@ export const RequestsTab = () => {
     setProcessingId(req.id);
 
     try {
-      // STEP 1: Update the Request Status FIRST
-      // (We do this first so the UI updates immediately, even if the member is deleted momentarily)
-      const { error: reqError } = await supabase
-        .from('member_requests')
-        .update({ status: 'approved' })
-        .eq('id', req.id);
-
-      if (reqError) throw reqError;
-
-      // STEP 2: Perform the Action (Delete or Move)
+      // 1. EXECUTE ACTION
       if (req.request_type === 'removal') {
-        // DELETE MEMBER
         const { error: delError } = await supabase
           .from('members')
           .delete()
@@ -69,28 +58,30 @@ export const RequestsTab = () => {
         toast.success("Member removed from database.");
       }
       else if (req.request_type === 'transfer') {
-        // TRANSFER MEMBER
         if (!req.target_unit_id) throw new Error("Target unit is missing.");
 
-        const { error: moveError } = await supabase
-          .from('members')
-          .update({
-             unit_id: req.target_unit_id,
-             subunit_id: null,       // Reset subunit (they are new in that unit)
-             role_in_unit: 'member'  // Reset role to regular member
-          })
-          .eq('id', req.member_id);
+        // USE THE NEW SECURE FUNCTION (RPC)
+        const { error: rpcError } = await supabase.rpc('approve_transfer', {
+          p_member_id: req.member_id,
+          p_target_unit_id: req.target_unit_id
+        });
 
-        if (moveError) throw moveError;
-        toast.success(`Transferred to ${req.target_unit?.name || 'new unit'}.`);
+        if (rpcError) throw rpcError;
+        toast.success(`Transferred to ${req.target_unit?.name}.`);
       }
+
+      // 2. UPDATE STATUS (Only if action succeeded)
+      const { error: reqError } = await supabase
+        .from('member_requests')
+        .update({ status: 'approved' })
+        .eq('id', req.id);
+
+      if (reqError) throw reqError;
 
       fetchRequests(); // Refresh table
     } catch (err: any) {
       console.error(err);
       toast.error("Action failed: " + err.message);
-      // If it failed, try to revert status (optional, but good practice)
-      await supabase.from('member_requests').update({ status: 'pending' }).eq('id', req.id);
     } finally {
       setProcessingId(null);
     }
@@ -156,8 +147,9 @@ export const RequestsTab = () => {
                         </span>
                       </td>
 
+                      {/* USE SNAPSHOT NAME */}
                       <td className="px-4 py-3 font-medium text-slate-900">
-                         {req.member ? req.member.full_name : <span className="text-slate-400 italic">Deleted Member</span>}
+                         {req.member_name || "Unknown Member"}
                       </td>
 
                       <td className="px-4 py-3">
@@ -179,7 +171,7 @@ export const RequestsTab = () => {
                         </span>
                       </td>
 
-                      {/* ACTIONS (Only for Pastors on Pending items) */}
+                      {/* ACTIONS */}
                       {isApprover && (
                         <td className="px-4 py-3 text-right">
                           {req.status === 'pending' && (

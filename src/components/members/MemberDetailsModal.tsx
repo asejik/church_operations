@@ -128,6 +128,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
       const { error } = await supabase.from('member_requests').insert({
         unit_id: profile.unit_id,
         member_id: member.id,
+        member_name: member.full_name, // <--- SAVE NAME HERE
         request_type: 'removal',
         reason: reason,
         status: 'pending'
@@ -153,6 +154,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
       const { error } = await supabase.from('member_requests').insert({
         unit_id: profile.unit_id,
         member_id: member.id,
+        member_name: member.full_name, // <--- SAVE NAME HERE
         request_type: 'transfer',
         target_unit_id: transferTargetId,
         reason: requestReason,
