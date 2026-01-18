@@ -1,0 +1,298 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type PerformanceReview } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { Plus, Search, Star, User, MessageSquare, BarChart2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useProfile } from '@/hooks/useProfile';
+
+// --- ADD REVIEW MODAL ---
+const AddReviewModal = ({ isOpen, onClose, onComplete }: { isOpen: boolean; onClose: () => void; onComplete: () => void }) => {
+  const { data: profile } = useProfile();
+  const [loading, setLoading] = useState(false);
+
+  // Initial State with 5 Categories
+  const [formData, setFormData] = useState<Partial<PerformanceReview>>({
+    member_id: '',
+    rating_punctuality: 3,
+    rating_availability: 3,
+    rating_skill: 3,
+    rating_teamwork: 3,
+    rating_spiritual: 3,
+    comment: '',
+    review_date: new Date().toISOString().split('T')[0]
+  });
+
+  const members = useLiveQuery(() => db.members.orderBy('full_name').toArray(), []);
+
+  const handleSubmit = async () => {
+    if (!profile?.unit_id || !formData.member_id) {
+      toast.error("Please select a member");
+      return;
+    }
+    setLoading(true);
+    try {
+      const newReview = {
+        unit_id: profile.unit_id,
+        member_id: formData.member_id,
+        rating_punctuality: Number(formData.rating_punctuality),
+        rating_availability: Number(formData.rating_availability),
+        rating_skill: Number(formData.rating_skill),
+        rating_teamwork: Number(formData.rating_teamwork),
+        rating_spiritual: Number(formData.rating_spiritual),
+        comment: formData.comment || '',
+        review_date: formData.review_date || new Date().toISOString().split('T')[0],
+      };
+
+      // 1. Cloud Save
+      const { error } = await supabase.from('performance_reviews').insert(newReview);
+      if (error) throw error;
+
+      // 2. Local Save
+      await db.performance.add({ ...newReview, synced: 1 });
+
+      toast.success("Holistic review saved");
+      onComplete();
+      onClose();
+      // Reset
+      setFormData({
+        member_id: '', rating_punctuality: 3, rating_availability: 3, rating_skill: 3, rating_teamwork: 3, rating_spiritual: 3, comment: '', review_date: new Date().toISOString().split('T')[0]
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save review");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper for Sliders
+  const RatingInput = ({ label, field }: { label: string, field: keyof PerformanceReview }) => (
+    <div>
+      <div className="flex justify-between text-xs uppercase font-bold text-slate-500 mb-1">
+        <span>{label}</span>
+        <span className="text-blue-600">{formData[field]} / 5</span>
+      </div>
+      <input
+        type="range" min="1" max="5" step="1"
+        className="w-full accent-blue-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+        value={formData[field] as number}
+        onChange={e => setFormData({ ...formData, [field]: parseInt(e.target.value) })}
+      />
+    </div>
+  );
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="New Performance Review">
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Select Member</label>
+            <select
+              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              value={formData.member_id}
+              onChange={e => setFormData({ ...formData, member_id: e.target.value })}
+            >
+              <option value="">-- Choose Member --</option>
+              {members?.map(m => (
+                <option key={m.id} value={m.id}>{m.full_name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className="text-xs font-bold text-slate-500 uppercase">Date</label>
+            <input
+              type="date"
+              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              value={formData.review_date}
+              onChange={e => setFormData({ ...formData, review_date: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+             <BarChart2 className="h-4 w-4 text-blue-600" />
+             <h3 className="text-sm font-bold text-slate-800">Scorecard</h3>
+          </div>
+          <RatingInput label="Punctuality" field="rating_punctuality" />
+          <RatingInput label="Availability" field="rating_availability" />
+          <RatingInput label="Skill Proficiency" field="rating_skill" />
+          <RatingInput label="Teamwork" field="rating_teamwork" />
+          <RatingInput label="Spiritual Growth" field="rating_spiritual" />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase">General Comment</label>
+          <textarea
+            className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            rows={2}
+            placeholder="Key observations..."
+            value={formData.comment}
+            onChange={e => setFormData({ ...formData, comment: e.target.value })}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} isLoading={loading}>Save Review</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// --- MAIN PAGE ---
+export const PerformancePage = () => {
+  const { data: profile } = useProfile();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('');
+
+  const reviews = useLiveQuery(() => db.performance.orderBy('review_date').reverse().toArray(), []);
+  const members = useLiveQuery(() => db.members.toArray(), []);
+
+  useEffect(() => {
+    const syncReviews = async () => {
+      if (!profile?.unit_id) return;
+      const { data } = await supabase.from('performance_reviews').select('*').eq('unit_id', profile.unit_id);
+      if (data) {
+        await db.performance.clear();
+        await db.performance.bulkPut(data.map((i: any) => ({ ...i, synced: 1 })));
+      }
+    };
+    syncReviews();
+  }, [profile?.unit_id]);
+
+  const processedData = useMemo(() => {
+    if (!reviews || !members) return { months: [], grouped: {} };
+
+    const grouped: Record<string, any[]> = {};
+    const monthsSet = new Set<string>();
+
+    reviews.forEach(r => {
+      const member = members.find(m => m.id === r.member_id);
+      if (!member) return;
+      if (searchQuery && !member.full_name.toLowerCase().includes(searchQuery.toLowerCase())) return;
+
+      const dateObj = new Date(r.review_date);
+      const monthKey = dateObj.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+      monthsSet.add(monthKey);
+      if (!grouped[monthKey]) grouped[monthKey] = [];
+
+      // Calculate Average
+      const avg = (r.rating_punctuality + r.rating_availability + r.rating_skill + r.rating_teamwork + r.rating_spiritual) / 5;
+
+      grouped[monthKey].push({
+        ...r,
+        member_name: member.full_name,
+        member_img: member.image_url,
+        average_score: avg.toFixed(1)
+      });
+    });
+
+    const sortedMonths = Array.from(monthsSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+    return { months: sortedMonths, grouped };
+  }, [reviews, members, searchQuery]);
+
+  useEffect(() => {
+    if (!activeTab && processedData.months.length > 0) {
+      setActiveTab(processedData.months[0]);
+    }
+  }, [processedData.months, activeTab]);
+
+  const currentReviews = activeTab ? (processedData.grouped[activeTab] || []) : [];
+
+  // Helper for small score badges
+  const ScoreBadge = ({ label, score }: { label: string, score: number }) => (
+    <div className="flex flex-col items-center">
+      <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>{score}</span>
+      <span className="text-[8px] text-slate-400 uppercase">{label}</span>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-2xl font-bold text-slate-900">Performance</h1><p className="text-slate-500">Holistic member evaluation</p></div>
+        {profile?.role !== 'unit_pastor' && ( <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Review</Button> )}
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+        <input type="text" placeholder="Search by member name..." className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+      </div>
+
+      {processedData.months.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {processedData.months.map(month => (
+            <button key={month} onClick={() => setActiveTab(month)} className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all ${activeTab === month ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'}`}>{month}</button>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                <th className="px-4 py-4 w-12 border-r border-slate-100 text-center">S/N</th>
+                <th className="px-4 py-4 border-r border-slate-100">Member Name</th>
+                <th className="px-4 py-4 border-r border-slate-100 text-center">Breakdown</th>
+                <th className="px-4 py-4 border-r border-slate-100 text-center w-24">Avg</th>
+                <th className="px-4 py-4 w-32 text-right">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {currentReviews.length === 0 ? (
+                 <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500"><div className="flex flex-col items-center"><MessageSquare className="h-10 w-10 text-slate-300 mb-2" /><p>No reviews found.</p></div></td></tr>
+              ) : (
+                currentReviews.map((review, i) => (
+                  <tr key={review.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-center text-slate-400 text-xs border-r border-slate-100">{(i + 1).toString().padStart(2, '0')}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
+                      <div className="flex items-center gap-2">
+                        {review.member_img ? <img src={review.member_img} alt="" className="h-6 w-6 rounded-full object-cover" /> : <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><User className="h-3 w-3" /></div>}
+                        <div className="flex flex-col">
+                            <span>{review.member_name}</span>
+                            <span className="text-[10px] text-slate-400 font-normal italic">"{review.comment}"</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* BREAKDOWN COLUMN */}
+                    <td className="px-4 py-3 border-r border-slate-100">
+                      <div className="flex justify-center gap-3">
+                         <ScoreBadge label="Punc" score={review.rating_punctuality} />
+                         <ScoreBadge label="Avail" score={review.rating_availability} />
+                         <ScoreBadge label="Skill" score={review.rating_skill} />
+                         <ScoreBadge label="Team" score={review.rating_teamwork} />
+                         <ScoreBadge label="Spirit" score={review.rating_spiritual} />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 border-r border-slate-100 text-center">
+                      <div className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-1 rounded-md border border-amber-100 font-bold text-xs">
+                        <span>{review.average_score}</span>
+                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-right text-slate-500 text-xs">
+                      {new Date(review.review_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <AddReviewModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onComplete={() => {}} />
+    </div>
+  );
+};
