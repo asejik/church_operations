@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,11 +16,25 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
   const { data: profile } = useProfile();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
+    item_name: '',
     quantity: '1',
     condition: 'good',
+    date_purchased: new Date().toISOString().slice(0, 10),
     notes: ''
   });
+
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        item_name: '',
+        quantity: '1',
+        condition: 'good',
+        date_purchased: new Date().toISOString().slice(0, 10),
+        notes: ''
+      });
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,9 +44,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
     try {
       const { error } = await supabase.from('inventory').insert({
         unit_id: profile.unit_id,
-        name: formData.name,
+        item_name: formData.item_name,
         quantity: parseInt(formData.quantity),
         condition: formData.condition,
+        date_purchased: formData.date_purchased,
         notes: formData.notes
       });
 
@@ -41,9 +56,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
       toast.success("Item added to inventory");
       onItemAdded();
       onClose();
-      setFormData({ name: '', quantity: '1', condition: 'good', notes: '' });
     } catch (err: any) {
-      toast.error("Failed to add item");
+      console.error(err);
+      toast.error(err.message || "Failed to add item");
     } finally {
       setLoading(false);
     }
@@ -57,8 +72,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
           <Input
             required
             placeholder="e.g. Bass Guitar Amp"
-            value={formData.name}
-            onChange={e => setFormData({...formData, name: e.target.value})}
+            value={formData.item_name}
+            onChange={e => setFormData({...formData, item_name: e.target.value})}
           />
         </div>
 
@@ -74,18 +89,30 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">Condition</label>
-            <select
-              className="flex h-11 w-full rounded-xl border border-slate-200 bg-white/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
-              value={formData.condition}
-              onChange={e => setFormData({...formData, condition: e.target.value})}
-            >
-              <option value="good">Good</option>
-              <option value="faulty">Faulty</option>
-              <option value="under_repair">Under Repair</option>
-              <option value="bad">Completely Bad</option>
-            </select>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Date Purchased</label>
+            <Input
+              type="date"
+              required
+              value={formData.date_purchased}
+              onChange={e => setFormData({...formData, date_purchased: e.target.value})}
+            />
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Condition</label>
+          <select
+            className="flex h-11 w-full rounded-xl border border-slate-200 bg-white/50 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
+            value={formData.condition}
+            onChange={e => setFormData({...formData, condition: e.target.value})}
+          >
+            <option value="new">New</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="faulty">Faulty</option>
+            <option value="under_repair">Under Repair</option>
+            <option value="bad">Completely Bad</option>
+          </select>
         </div>
 
         <div>

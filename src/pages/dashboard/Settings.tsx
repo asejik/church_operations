@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { db } from '@/lib/db';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/Button';
 import { Lock, User } from 'lucide-react';
@@ -32,10 +31,9 @@ export const SettingsPage = () => {
 
       if (profileError) throw profileError;
 
-      // Sync with Units table if Pastor
+      // Sync with Units table if Pastor (Online Only)
       if (profile.role === 'unit_pastor' && profile.unit_id) {
         await supabase.from('units').update({ pastor_name: fullName }).eq('id', profile.unit_id);
-        await db.units.update(profile.unit_id, { pastor_name: fullName, synced: 1 });
       }
 
       toast.success("Profile updated successfully");

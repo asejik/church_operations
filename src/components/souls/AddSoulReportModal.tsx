@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
 import { toast } from 'sonner';
 import { Heart, Calendar } from 'lucide-react';
 
@@ -17,8 +15,8 @@ interface AddSoulReportModalProps {
 
 export const AddSoulReportModal: React.FC<AddSoulReportModalProps> = ({ isOpen, onClose, onReportSubmitted }) => {
   const { data: profile } = useProfile();
-  const members = useLiveQuery(() => db.members.toArray()); // Load members locally
   const [loading, setLoading] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     member_id: '',
@@ -27,6 +25,20 @@ export const AddSoulReportModal: React.FC<AddSoulReportModalProps> = ({ isOpen, 
     names: '',
     notes: ''
   });
+
+  // Fetch members when modal opens
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!profile?.unit_id || !isOpen) return;
+      const { data } = await supabase
+        .from('members')
+        .select('id, full_name')
+        .eq('unit_id', profile.unit_id)
+        .order('full_name');
+      setMembers(data || []);
+    };
+    fetchMembers();
+  }, [profile?.unit_id, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +52,7 @@ export const AddSoulReportModal: React.FC<AddSoulReportModalProps> = ({ isOpen, 
     try {
       const { error } = await supabase.from('soul_reports').insert({
         unit_id: profile.unit_id,
-        member_id: formData.member_id, // Link to specific member
-        reporter_id: profile.id,
+        member_id: formData.member_id,
         count: parseInt(formData.count),
         report_date: formData.date,
         convert_names: formData.names,
@@ -62,7 +73,7 @@ export const AddSoulReportModal: React.FC<AddSoulReportModalProps> = ({ isOpen, 
         notes: ''
       });
     } catch (err: any) {
-      toast.error("Failed to submit report");
+      toast.error(err.message || "Failed to submit report");
     } finally {
       setLoading(false);
     }
@@ -82,7 +93,7 @@ export const AddSoulReportModal: React.FC<AddSoulReportModalProps> = ({ isOpen, 
             required
           >
             <option value="">-- Select Member --</option>
-            {members?.map(m => (
+            {members.map(m => (
               <option key={m.id} value={m.id}>{m.full_name}</option>
             ))}
           </select>

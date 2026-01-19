@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
-import { useDashboardStats } from '@/hooks/useDashboardStats'; // <--- NEW HOOK
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { AdminHome } from './AdminHome';
+import { ReportModal } from '@/components/dashboard/ReportModal';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Users, User, Calendar, Settings, Layers, PieChart, Lock, Loader2 } from 'lucide-react';
+import { Users, User, Calendar, Settings, Plus, Layers, PieChart, Lock, Loader2, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // --- SUB-COMPONENT: UNIT PROFILE MODAL ---
@@ -27,7 +28,6 @@ const UnitProfileModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: bo
         description: formData.description,
       };
 
-      // Direct Cloud Update
       const { error } = await supabase
         .from('units')
         .update(updates)
@@ -36,7 +36,7 @@ const UnitProfileModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: bo
       if (error) throw error;
 
       toast.success("Unit details updated!");
-      onSave(); // Trigger reload
+      onSave();
       onClose();
     } catch (err) {
       toast.error("Failed to update profile");
@@ -71,15 +71,88 @@ const UnitProfileModal = ({ isOpen, onClose, initialData, onSave }: { isOpen: bo
   );
 };
 
-// --- MAIN HOME COMPONENT ---
+// --- SUB-COMPONENT: SUBUNITS MODAL (ONLINE FIRST) ---
+const SubunitsModal = ({ isOpen, onClose, onUpdate }: { isOpen: boolean; onClose: () => void; onUpdate: () => void }) => {
+  const { data: profile } = useProfile();
+  const [newSubunit, setNewSubunit] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [subunits, setSubunits] = useState<any[]>([]);
+
+  // Fetch Subunits when modal opens
+  useEffect(() => {
+    if (isOpen && profile?.unit_id) {
+      fetchSubunits();
+    }
+  }, [isOpen, profile?.unit_id]);
+
+  const fetchSubunits = async () => {
+    if (!profile?.unit_id) return;
+    const { data } = await supabase.from('subunits').select('*').eq('unit_id', profile.unit_id);
+    setSubunits(data || []);
+  };
+
+  const handleAdd = async () => {
+    if (!profile?.unit_id || !newSubunit.trim()) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('subunits')
+        .insert({ unit_id: profile.unit_id, name: newSubunit });
+
+      if (error) throw error;
+
+      setNewSubunit('');
+      toast.success("Subunit created");
+      fetchSubunits(); // Refresh list
+      onUpdate(); // Update parent stats
+    } catch (err) {
+      toast.error("Failed to add subunit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this subunit? Members will be unassigned.")) return;
+    try {
+      const { error } = await supabase.from('subunits').delete().eq('id', id);
+      if (error) throw error;
+      toast.success("Subunit removed");
+      fetchSubunits();
+      onUpdate();
+    } catch (err) { toast.error("Failed to delete"); }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Manage Subunits">
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <input className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" placeholder="e.g. Camera Team" value={newSubunit} onChange={e => setNewSubunit(e.target.value)} />
+          <Button onClick={handleAdd} isLoading={loading} size="sm"><Plus className="h-4 w-4" /></Button>
+        </div>
+        <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto">
+          {subunits.length === 0 ? <p className="text-center text-xs text-slate-400 italic py-4">No subunits yet.</p> : subunits.map(s => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-sm font-medium text-slate-700">{s.name}</span>
+                <button onClick={() => handleDelete(s.id)} className="text-red-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+              </div>
+          ))}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// --- MAIN DASHBOARD COMPONENT ---
 export const DashboardHome = () => {
   const { data: profile } = useProfile();
 
-  // USE THE NEW ONLINE HOOK (Replaces Dexie)
-  const { stats, birthdays, unitProfile: unit, loading } = useDashboardStats();
+  // USE THE NEW ONLINE HOOK
+  const { stats, birthdays, unitProfile: unit, loading, refresh } = useDashboardStats();
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSubunitModalOpen, setIsSubunitModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   if (!profile) return null;
 
@@ -120,12 +193,27 @@ export const DashboardHome = () => {
               </div>
             </div>
           </div>
-          {/* HIDE SETTINGS IF PASTOR */}
-          {profile.role !== 'unit_pastor' && (
-            <Button variant="outline" size="sm" className="bg-white/5 border-white/10 text-white hover:bg-white/10" onClick={() => setIsProfileModalOpen(true)}>
-              <Settings className="mr-2 h-3.5 w-3.5" /> Manage Profile
-            </Button>
-          )}
+
+          <div className="flex gap-2">
+            {/* REPORTS BUTTON (Visible to Pastor Only) */}
+            {profile.role === 'unit_pastor' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                onClick={() => setIsReportModalOpen(true)}
+              >
+                <Download className="mr-2 h-3.5 w-3.5" /> Reports
+              </Button>
+            )}
+
+            {/* PROFILE SETTINGS (Hidden for Pastor) */}
+            {profile.role !== 'unit_pastor' && (
+              <Button variant="outline" size="sm" className="bg-white/5 border-white/10 text-white hover:bg-white/10" onClick={() => setIsProfileModalOpen(true)}>
+                <Settings className="mr-2 h-3.5 w-3.5" /> Manage Profile
+              </Button>
+            )}
+          </div>
         </div>
         <Layers className="absolute -right-6 -bottom-6 h-40 w-40 text-white opacity-5 rotate-12" />
       </div>
@@ -146,13 +234,14 @@ export const DashboardHome = () => {
                 <div className="h-3 w-full overflow-hidden rounded-full bg-pink-100"><div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${stats.ratio}%` }}></div></div>
               </div>
             </div>
+
             {/* Subunits */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
               <div>
                  <div className="flex items-center gap-2 text-slate-500 mb-2"><PieChart className="h-4 w-4" /><h3 className="text-xs font-bold uppercase">Subunits</h3></div>
                  <div className="flex items-baseline gap-2"><span className="text-2xl font-bold text-slate-900">{stats.subunitsCount}</span><span className="text-xs text-slate-400">active teams</span></div>
               </div>
-              {/* Hide Manage Button for Pastor */}
+              {/* Manage Button (Hidden for Pastor) */}
               {profile.role !== 'unit_pastor' && (
                 <Button size="sm" variant="ghost" className="self-start mt-2 -ml-2 text-blue-600 hover:bg-blue-50" onClick={() => setIsSubunitModalOpen(true)}>Manage Subunits</Button>
               )}
@@ -178,7 +267,9 @@ export const DashboardHome = () => {
         </div>
       </div>
 
-      <UnitProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} initialData={unit} onSave={() => window.location.reload()} />
+      <UnitProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} initialData={unit} onSave={refresh} />
+      <SubunitsModal isOpen={isSubunitModalOpen} onClose={() => setIsSubunitModalOpen(false)} onUpdate={refresh} />
+      <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
     </div>
   );
 };

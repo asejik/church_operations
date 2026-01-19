@@ -1,294 +1,284 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/Button';
-import { SessionEditor } from '@/components/attendance/SessionEditor';
-import { Plus, History, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
-
-// Helper to group logs by event
-const useAttendanceMatrix = () => {
-  // 1. Fetch Members Sorted Alphabetically
-  const members = useLiveQuery(() => db.members.orderBy('full_name').toArray(), []);
-  const logs = useLiveQuery(() => db.attendanceLogs.toArray(), []);
-
-  return useMemo(() => {
-    if (!members || !logs) return { headers: [], rows: [] };
-
-    // 2. Get Unique Sessions (Events)
-    const sessionsMap = new Map();
-    logs.forEach(log => {
-      if (!sessionsMap.has(log.event_id)) {
-        // Calculate Stats for this session
-        const sessionLogs = logs.filter(l => l.event_id === log.event_id);
-        const presentCount = sessionLogs.filter(l => l.status === 'present').length;
-        const absentCount = sessionLogs.filter(l => l.status === 'absent').length;
-
-        sessionsMap.set(log.event_id, {
-          id: log.event_id,
-          date: log.event_date,
-          present: presentCount,
-          absent: absentCount
-        });
-      }
-    });
-
-    // Sort sessions by date (Oldest -> Newest) for correct rendering order
-    const headers = Array.from(sessionsMap.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // 3. Build Rows (Member + Their Logs)
-    const rows = members.map(member => {
-      const memberLogs: any = {};
-      logs.filter(l => l.member_id === member.id).forEach(l => {
-        memberLogs[l.event_id] = l;
-      });
-      return { member, attendance: memberLogs };
-    });
-
-    return { headers, rows };
-  }, [members, logs]);
-};
+import { Button } from '@/components/ui/Button';
+import { Plus, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, Pencil } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO } from 'date-fns';
+import { toast } from 'sonner';
+import { NewSessionModal } from '@/components/dashboard/NewSessionModal';
 
 export const AttendancePage = () => {
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [view, setView] = useState<'matrix' | 'history'>('matrix');
-  const [activeTab, setActiveTab] = useState<string>(''); // For Month Tabs
+  const { data: profile, isLoading: profileLoading } = useProfile();
 
-  const { headers, rows } = useAttendanceMatrix();
+  // VIEW STATE
+  const [viewMode, setViewMode] = useState<'matrix' | 'history'>('matrix');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  // --- SYNC ON MOUNT ---
-  useEffect(() => {
-    const syncAttendance = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from('profiles').select('unit_id').eq('id', user.id).single();
-      if (!profile?.unit_id) return;
+  // DATA STATE
+  const [members, setMembers] = useState<any[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
 
-      const { data: logs } = await supabase.from('attendance').select('*').eq('unit_id', profile.unit_id);
+  // MODAL STATE
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editSessionDate, setEditSessionDate] = useState<string | undefined>(undefined);
+  const [editSessionStatuses, setEditSessionStatuses] = useState<Record<string, 'present' | 'absent'> | undefined>(undefined);
 
-      if (logs) {
-        await db.attendanceLogs.bulkPut(logs.map((l: any) => ({ ...l, synced: 1 })));
-      }
-    };
-    syncAttendance();
-  }, []);
+  // ROLE CHECK: Is the user allowed to Edit? (Only Unit Heads)
+  const isEditor = profile?.role === 'unit_head';
 
-  // --- MONTH GROUPING LOGIC ---
-  const processedData = useMemo(() => {
-    const monthsSet = new Set<string>();
+  const fetchData = async () => {
+    if (!profile?.unit_id) return;
 
-    // Extract unique months from headers
-    headers.forEach(h => {
-      const dateObj = new Date(h.date);
-      const monthKey = dateObj.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-      monthsSet.add(monthKey);
-    });
+    setDataLoading(true);
+    try {
+      // A. Fetch Members
+      const { data: memberData, error: memberError } = await supabase
+        .from('members')
+        .select('id, full_name')
+        .eq('unit_id', profile.unit_id)
+        .order('full_name');
 
-    // Sort months (Newest first)
-    const sortedMonths = Array.from(monthsSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      if (memberError) throw memberError;
 
-    return { months: sortedMonths };
-  }, [headers]);
+      // B. Fetch Logs
+      const start = startOfMonth(currentDate).toISOString();
+      const end = endOfMonth(currentDate).toISOString();
 
-  // Set default tab
-  useEffect(() => {
-    if (!activeTab && processedData.months.length > 0) {
-      setActiveTab(processedData.months[0]);
+      const { data: logsData, error: logsError } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('unit_id', profile.unit_id)
+        .gte('event_date', start)
+        .lte('event_date', end);
+
+      if (logsError) throw logsError;
+
+      setMembers(memberData || []);
+      setAttendanceLogs(logsData || []);
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load attendance");
+    } finally {
+      setDataLoading(false);
     }
-  }, [processedData.months, activeTab]);
+  };
 
-  // Filter Headers based on Active Tab
-  const filteredHeaders = useMemo(() => {
-    if (!activeTab) return [];
-    return headers.filter(h => {
-      const monthKey = new Date(h.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-      return monthKey === activeTab;
+  useEffect(() => {
+    if (profile?.unit_id) {
+      fetchData();
+    }
+  }, [profile?.unit_id, currentDate]);
+
+  const handleEditSession = (dateStr: string) => {
+    if (!isEditor) return; // Guard
+    const logs = attendanceLogs.filter(l => l.event_date === dateStr);
+    const statuses: Record<string, 'present' | 'absent'> = {};
+    logs.forEach(l => {
+      statuses[l.member_id] = l.status;
     });
-  }, [headers, activeTab]);
-
-  // Pagination for columns (Matrix View)
-  const [page, setPage] = useState(0);
-  const SESSIONS_PER_PAGE = 5;
-
-  // Logic to show LATEST sessions first within the month
-  // We want to slice from the end of the array because headers are sorted Oldest->Newest
-  // But usually, we want to see the latest dates on the right or left.
-  // Let's simply slice the filtered headers.
-  // To make it intuitive: For "Jan 2026", we usually want to see 1st Jan -> 31st Jan.
-
-  const startIndex = Math.max(0, filteredHeaders.length - SESSIONS_PER_PAGE - (page * SESSIONS_PER_PAGE));
-  const visibleHeaders = filteredHeaders.slice(startIndex, startIndex + SESSIONS_PER_PAGE);
-
-  const handleEditSession = (sessionId: string) => {
-    setEditingSessionId(sessionId);
-    setIsEditorOpen(true);
+    setEditSessionDate(dateStr);
+    setEditSessionStatuses(statuses);
+    setIsModalOpen(true);
   };
 
   const handleNewSession = () => {
-    setEditingSessionId(null);
-    setIsEditorOpen(true);
+    setEditSessionDate(undefined);
+    setEditSessionStatuses(undefined);
+    setIsModalOpen(true);
   };
 
-  const { data: profile } = useProfile();
+  const handleSessionSaved = () => {
+    fetchData();
+  };
+
+  const eventDates = useMemo(() => {
+    const dates = new Set<string>();
+    attendanceLogs.forEach(log => {
+      if (log.event_date) dates.add(log.event_date);
+    });
+    return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  }, [attendanceLogs]);
+
+  const matrixDates = [...eventDates].reverse();
+
+  const getStatus = (memberId: string, dateStr: string) => {
+    const log = attendanceLogs.find(l => l.member_id === memberId && l.event_date === dateStr);
+    return log?.status || '-';
+  };
+
+  const getDailyStats = (dateStr: string) => {
+    const logs = attendanceLogs.filter(l => l.event_date === dateStr);
+    const present = logs.filter(l => l.status === 'present').length;
+    const absent = logs.filter(l => l.status === 'absent').length;
+    return { present, absent };
+  };
+
+  const handleMonthChange = (dir: 'prev' | 'next') => {
+    setCurrentDate(curr => dir === 'prev' ? subMonths(curr, 1) : addMonths(curr, 1));
+  };
+
+  if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
+  if (!profile?.unit_id) return <div className="text-center py-10 text-slate-400">Unit profile not found.</div>;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* HEADER */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
-          <p className="text-slate-500">Track presence and consistency</p>
+           <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
+           <p className="text-slate-500">Track presence and consistency</p>
         </div>
-        <div className="flex gap-2">
-           <div className="flex bg-slate-100 p-1 rounded-lg">
-              {profile?.role !== 'unit_pastor' && (
-                <button onClick={() => setView('matrix')} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${view === 'matrix' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Matrix</button>
-              )}
-              {profile?.role !== 'unit_pastor' && (
-                <button onClick={() => setView('history')} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${view === 'history' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>History</button>
-              )}
-           </div>
-           {profile?.role !== 'unit_pastor' && (
+
+        {/* CONTROLS (Only visible to Editor/Unit Head) */}
+        {isEditor && (
+          <div className="flex items-center gap-4">
+            <div className="flex bg-slate-100 p-1 rounded-lg">
+              <button
+                onClick={() => setViewMode('matrix')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'matrix' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                <LayoutGrid className="h-4 w-4" /> Matrix
+              </button>
+              <button
+                onClick={() => setViewMode('history')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'history' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                <List className="h-4 w-4" /> History
+              </button>
+            </div>
+
             <Button onClick={handleNewSession}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Session
+              <Plus className="mr-2 h-4 w-4" /> New Session
             </Button>
-            )}
+          </div>
+        )}
+      </div>
+
+      {/* MONTH NAV */}
+      <div className="flex justify-center">
+        <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+           <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-50 rounded-md text-slate-500"><ChevronLeft className="h-4 w-4" /></button>
+           <div className="px-4 font-bold text-slate-700 min-w-[140px] text-center">
+             {format(currentDate, 'MMMM yyyy')}
+           </div>
+           <button onClick={() => handleMonthChange('next')} className="p-2 hover:bg-slate-50 rounded-md text-slate-500"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
 
-      {/* --- MONTH TABS --- */}
-      {processedData.months.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-          {processedData.months.map(month => (
-            <button
-              key={month}
-              onClick={() => { setActiveTab(month); setPage(0); }}
-              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                activeTab === month
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300'
-              }`}
-            >
-              {month}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {view === 'matrix' ? (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          {/* Scroll Controls */}
-          {filteredHeaders.length > SESSIONS_PER_PAGE && (
-            <div className="flex justify-between border-b border-slate-100 bg-slate-50 px-4 py-2">
-              <button
-                 disabled={startIndex <= 0}
-                 onClick={() => setPage(p => p + 1)}
-                 className="flex items-center text-xs font-medium text-slate-500 disabled:opacity-30 hover:text-blue-600"
-              >
-                <ChevronLeft className="h-4 w-4" /> Older
-              </button>
-              <span className="text-xs font-bold text-slate-400">Showing {visibleHeaders.length} of {filteredHeaders.length} sessions</span>
-              <button
-                 disabled={startIndex + SESSIONS_PER_PAGE >= filteredHeaders.length}
-                 onClick={() => setPage(p => p - 1)}
-                 className="flex items-center text-xs font-medium text-slate-500 disabled:opacity-30 hover:text-blue-600"
-              >
-                Newer <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                  <th className="px-4 py-3 font-semibold w-12 text-center border-r border-slate-100">S/N</th>
-                  <th className="px-4 py-3 font-semibold border-r border-slate-100 min-w-[200px]">Member Name</th>
-
-                  {visibleHeaders.map(h => (
-                    <th key={h.id} className="px-2 py-2 text-center min-w-[100px] border-r border-slate-100 last:border-0">
-                      <div className="flex flex-col items-center gap-1 cursor-pointer hover:bg-slate-200 rounded p-1 transition-colors" onClick={() => handleEditSession(h.id)}>
-                        <span className="text-xs font-bold text-slate-900">
-                          {new Date(h.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                        </span>
-                        <div className="flex gap-2 text-[10px]">
-                          <span className="text-green-600 font-medium">P: {h.present}</span>
-                          <span className="text-red-500 font-medium">A: {h.absent}</span>
-                        </div>
-                      </div>
-                    </th>
-                  ))}
-                  {visibleHeaders.length === 0 && <th className="px-4 py-4 text-center text-slate-400 font-normal italic">No sessions this month</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map((row, index) => (
-                  <tr key={row.member.id} className="hover:bg-slate-50 group">
-                    <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900 border-r border-slate-100 group-hover:text-blue-700 transition-colors">{row.member.full_name}</td>
-
-                    {visibleHeaders.map(h => {
-                      const log = row.attendance[h.id];
-                      if (!log) return <td key={h.id} className="px-2 py-3 text-center text-slate-300 border-r border-slate-100 last:border-0">-</td>;
-                      const isPresent = log.status === 'present';
-                      return (
-                        <td key={h.id} className="px-2 py-3 text-center border-r border-slate-100 last:border-0">
-                          <div className={`mx-auto flex h-7 w-7 items-center justify-center rounded text-xs font-bold border cursor-default group/cell relative ${isPresent ? 'bg-green-100 border-green-200 text-green-700' : 'bg-red-100 border-red-200 text-red-700 cursor-help'}`}>
-                            {isPresent ? 'P' : 'A'}
-                            {!isPresent && log.reason && (
-                              <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 w-max max-w-[150px] rounded bg-slate-900 px-2 py-1 text-[10px] font-normal text-white shadow-lg group-hover/cell:block z-20">
-                                {log.reason}<div className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900"></div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        /* HISTORY VIEW (Filtered by Month) */
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredHeaders.length === 0 ? (
-             <div className="col-span-full py-12 text-center text-slate-500 border border-dashed border-slate-300 rounded-xl">
-                <Calendar className="mx-auto h-10 w-10 text-slate-300 mb-2" />
-                <p>No attendance sessions found for {activeTab}.</p>
-             </div>
-          ) : (
-             filteredHeaders.slice().reverse().map(session => (
-               <div key={session.id} onClick={() => handleEditSession(session.id)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-300 transition-all group">
-                  <div className="flex items-center justify-between mb-3">
-                     <span className="text-lg font-bold text-slate-900">
-                       {new Date(session.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                     </span>
-                     <History className="h-4 w-4 text-slate-400 group-hover:text-blue-500" />
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1.5 text-green-700 bg-green-50 px-2 py-1 rounded"><span className="font-bold">{session.present}</span> Present</div>
-                    <div className="flex items-center gap-1.5 text-red-700 bg-red-50 px-2 py-1 rounded"><span className="font-bold">{session.absent}</span> Absent</div>
-                  </div>
+      {/* CONTENT AREA */}
+      <div className="min-h-[400px]">
+        {dataLoading ? (
+           <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+        ) : members.length === 0 ? (
+           <div className="text-center py-12 text-slate-400">No members found.</div>
+        ) : (
+           <>
+             {/* MATRIX VIEW (Default for everyone) */}
+             {(viewMode === 'matrix' || !isEditor) && (
+               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                 <div className="overflow-x-auto">
+                   <table className="w-full text-left text-sm whitespace-nowrap">
+                     <thead>
+                       <tr className="bg-slate-50 border-b border-slate-200">
+                         <th className="px-4 py-4 w-12 font-bold text-slate-400">S/N</th>
+                         <th className="px-4 py-4 font-bold text-slate-700 sticky left-0 bg-slate-50 z-10 shadow-sm">Member Name</th>
+                         {matrixDates.length === 0 ? (
+                           <th className="px-4 py-4 font-normal text-slate-400 italic">No sessions this month</th>
+                         ) : (
+                           matrixDates.map(date => {
+                             const stats = getDailyStats(date);
+                             return (
+                               <th key={date} className="px-4 py-3 text-center min-w-[100px]">
+                                 <div className="font-bold text-slate-700">{format(parseISO(date), 'EEE d MMM')}</div>
+                                 <div className="flex justify-center gap-2 text-[10px] mt-1">
+                                   <span className="text-green-600 font-bold">P: {stats.present}</span>
+                                   <span className="text-red-500 font-bold">A: {stats.absent}</span>
+                                 </div>
+                               </th>
+                             );
+                           })
+                         )}
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                       {members.map((member, idx) => (
+                         <tr key={member.id} className="hover:bg-slate-50">
+                           <td className="px-4 py-3 text-slate-400 text-xs font-mono">{(idx + 1).toString().padStart(2, '0')}</td>
+                           <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10">{member.full_name}</td>
+                           {matrixDates.map(date => {
+                             const status = getStatus(member.id, date);
+                             return (
+                               <td key={date} className="px-4 py-3 text-center">
+                                 {status === 'present' && <span className="inline-flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded font-bold text-xs">P</span>}
+                                 {status === 'absent' && <span className="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded font-bold text-xs">A</span>}
+                                 {status === '-' && <span className="text-slate-300">-</span>}
+                               </td>
+                             );
+                           })}
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
                </div>
-            ))
-          )}
-        </div>
-      )}
+             )}
 
-      {isEditorOpen && (
-        <SessionEditor
-          isOpen={isEditorOpen}
-          onClose={() => setIsEditorOpen(false)}
-          existingSessionId={editingSessionId}
-          onSaveComplete={() => {}}
-        />
-      )}
+             {/* HISTORY VIEW (Editors Only) */}
+             {viewMode === 'history' && isEditor && (
+               <div className="space-y-3">
+                 {eventDates.length === 0 ? (
+                   <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">No sessions recorded for {format(currentDate, 'MMMM')}.</div>
+                 ) : (
+                   eventDates.map(date => {
+                     const stats = getDailyStats(date);
+                     const attendancePercent = Math.round((stats.present / (stats.present + stats.absent)) * 100) || 0;
+
+                     return (
+                       <div key={date} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm hover:border-blue-300 transition-colors">
+                         <div className="flex items-center gap-6">
+                           <div className="text-center min-w-[60px]">
+                             <div className="text-2xl font-bold text-slate-900">{format(parseISO(date), 'dd')}</div>
+                             <div className="text-xs font-bold text-slate-500 uppercase">{format(parseISO(date), 'MMM')}</div>
+                           </div>
+
+                           <div className="h-10 w-px bg-slate-100"></div>
+
+                           <div>
+                             <h3 className="font-bold text-slate-800">{format(parseISO(date), 'EEEE')} Service</h3>
+                             <div className="flex gap-4 text-sm mt-1">
+                               <span className="text-green-600 font-medium">{stats.present} Present</span>
+                               <span className="text-slate-400">•</span>
+                               <span className="text-red-500 font-medium">{stats.absent} Absent</span>
+                               <span className="text-slate-400">•</span>
+                               <span className="text-slate-500">{attendancePercent}% Turnout</span>
+                             </div>
+                           </div>
+                         </div>
+
+                         <Button variant="outline" size="sm" onClick={() => handleEditSession(date)}>
+                           <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                         </Button>
+                       </div>
+                     )
+                   })
+                 )}
+               </div>
+             )}
+           </>
+        )}
+      </div>
+
+      <NewSessionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        unitId={profile.unit_id}
+        members={members}
+        onSuccess={handleSessionSaved}
+        defaultDate={editSessionDate}
+        initialStatuses={editSessionStatuses}
+      />
     </div>
   );
 };
