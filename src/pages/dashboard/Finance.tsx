@@ -87,7 +87,8 @@ export const FinancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
   const isAdmin = profile?.role === 'admin_pastor';
 
-  const [activeTab, setActiveTab] = useState<'ledger' | 'requests'>('ledger');
+  // Changed default state to 'requests' so it comes first
+  const [activeTab, setActiveTab] = useState<'ledger' | 'requests'>('requests');
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
 
@@ -102,6 +103,7 @@ export const FinancePage = () => {
   const [units, setUnits] = useState<any[]>([]); // For filter dropdown
   const [loading, setLoading] = useState(false);
 
+  // Redundant but safe: ensure admin always sees requests
   useEffect(() => {
     if (isAdmin) setActiveTab('requests');
   }, [isAdmin]);
@@ -163,7 +165,6 @@ export const FinancePage = () => {
 
     // 2. Unit Filter (Admin only)
     if (isAdmin && selectedUnit !== 'all') {
-      // Handle both ledger (unit_id) and requests (unit_id)
       if (item.unit_id !== selectedUnit) return false;
     }
 
@@ -199,8 +200,9 @@ export const FinancePage = () => {
 
         {!isAdmin && (
           <div className="flex bg-slate-100 p-1 rounded-lg self-start">
-             <button onClick={() => setActiveTab('ledger')} className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ledger' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Unit Ledger</button>
+             {/* Swapped Button Order: Admin Requests First */}
              <button onClick={() => setActiveTab('requests')} className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'requests' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Admin Requests</button>
+             <button onClick={() => setActiveTab('ledger')} className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ledger' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Unit Ledger</button>
           </div>
         )}
       </div>
@@ -219,7 +221,6 @@ export const FinancePage = () => {
          </div>
 
          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            {/* UNIT FILTER (Admin Only) */}
             {isAdmin && (
               <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
@@ -233,7 +234,6 @@ export const FinancePage = () => {
               </select>
             )}
 
-            {/* DATE FILTER */}
             <input
               type="date"
               className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
@@ -241,7 +241,6 @@ export const FinancePage = () => {
               onChange={e => setSelectedDate(e.target.value)}
             />
 
-            {/* CLEAR FILTERS */}
             {(selectedUnit !== 'all' || selectedDate || searchQuery) && (
               <Button
                 variant="ghost"
@@ -261,29 +260,7 @@ export const FinancePage = () => {
          </div>
       </div>
 
-      {activeTab === 'ledger' && !isAdmin && (
-        <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-slate-500 mb-1"><Wallet className="h-4 w-4" /><span className="text-xs font-bold uppercase">Net Balance</span></div><p className={`text-2xl font-bold ${balance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>{formatCurrency(balance)}</p></div>
-            <div className="rounded-xl border border-green-100 bg-green-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-green-600 mb-1"><TrendingUp className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Income</span></div><p className="text-2xl font-bold text-green-700">{formatCurrency(totalIncome)}</p></div>
-            <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-red-600 mb-1"><TrendingDown className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Expense</span></div><p className="text-2xl font-bold text-red-700">{formatCurrency(totalExpense)}</p></div>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
-            {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
-              <table className="w-full text-left text-sm">
-                <thead><tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold"><th className="px-4 py-3 w-12 text-center border-r border-slate-100">S/N</th><th className="px-4 py-3 w-24 text-center border-r border-slate-100">Type</th><th className="px-4 py-3 border-r border-slate-100">Item Name</th><th className="px-4 py-3 border-r border-slate-100">Category</th><th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th><th className="px-4 py-3 w-24 text-right">Date</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredLedger.length === 0 ? ( <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No records found matching filters.</td></tr> ) : ( filteredLedger.map((t, index) => (
-                      <tr key={t.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td><td className="px-4 py-3 text-center border-r border-slate-100">{t.type === 'income' ? <span className="inline-flex items-center gap-1 text-green-600"><ArrowUpRight className="h-3 w-3" /> In</span> : <span className="inline-flex items-center gap-1 text-red-600"><ArrowDownLeft className="h-3 w-3" /> Out</span>}</td><td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{t.title || "—"}</td><td className="px-4 py-3 text-slate-500 border-r border-slate-100">{t.category}</td><td className={`px-4 py-3 text-right font-mono font-bold border-r border-slate-100 ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'expense' && '- '}{formatCurrency(t.amount)}</td><td className="px-4 py-3 text-right text-slate-500 text-xs">{formatDate(t.date)}</td></tr>
-                    )))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
-      )}
-
+      {/* --- MOVED REQUESTS BLOCK TO TOP (Since it's the first tab now) --- */}
       {activeTab === 'requests' && (
         <>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
@@ -333,6 +310,29 @@ export const FinancePage = () => {
                         <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 border-r border-slate-100">{formatCurrency(req.amount)}</td>
                         <td className="px-4 py-3 text-right text-slate-500 text-xs">{formatDate(req.request_date || req.created_at)}</td>
                       </tr>
+                    )))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'ledger' && !isAdmin && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-slate-500 mb-1"><Wallet className="h-4 w-4" /><span className="text-xs font-bold uppercase">Net Balance</span></div><p className={`text-2xl font-bold ${balance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>{formatCurrency(balance)}</p></div>
+            <div className="rounded-xl border border-green-100 bg-green-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-green-600 mb-1"><TrendingUp className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Income</span></div><p className="text-2xl font-bold text-green-700">{formatCurrency(totalIncome)}</p></div>
+            <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-red-600 mb-1"><TrendingDown className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Expense</span></div><p className="text-2xl font-bold text-red-700">{formatCurrency(totalExpense)}</p></div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
+            {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
+              <table className="w-full text-left text-sm">
+                <thead><tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold"><th className="px-4 py-3 w-12 text-center border-r border-slate-100">S/N</th><th className="px-4 py-3 w-24 text-center border-r border-slate-100">Type</th><th className="px-4 py-3 border-r border-slate-100">Item Name</th><th className="px-4 py-3 border-r border-slate-100">Category</th><th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th><th className="px-4 py-3 w-24 text-right">Date</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredLedger.length === 0 ? ( <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No records found matching filters.</td></tr> ) : ( filteredLedger.map((t, index) => (
+                      <tr key={t.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td><td className="px-4 py-3 text-center border-r border-slate-100">{t.type === 'income' ? <span className="inline-flex items-center gap-1 text-green-600"><ArrowUpRight className="h-3 w-3" /> In</span> : <span className="inline-flex items-center gap-1 text-red-600"><ArrowDownLeft className="h-3 w-3" /> Out</span>}</td><td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{t.title || "—"}</td><td className="px-4 py-3 text-slate-500 border-r border-slate-100">{t.category}</td><td className={`px-4 py-3 text-right font-mono font-bold border-r border-slate-100 ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'expense' && '- '}{formatCurrency(t.amount)}</td><td className="px-4 py-3 text-right text-slate-500 text-xs">{formatDate(t.date)}</td></tr>
                     )))}
                 </tbody>
               </table>
