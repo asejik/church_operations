@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'; // Added React import
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownLeft, Send, CheckCircle, XCircle, Clock, Loader2, MessageSquare } from 'lucide-react';
+import { Plus, Search, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownLeft, CheckCircle, XCircle, Clock, Loader2, MessageSquare, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { CreateRequestModal } from '@/components/finance/CreateRequestModal';
@@ -15,7 +15,6 @@ interface AddLedgerModalProps {
 }
 
 // --- MODAL: ADD LEDGER TRANSACTION (Unit Head Only) ---
-// Fixed: Added explicit React.FC type to prevent "implicitly has type any" error
 const AddLedgerModal: React.FC<AddLedgerModalProps> = ({ isOpen, onClose, onComplete }) => {
   const { data: profile } = useProfile();
   const [loading, setLoading] = useState(false);
@@ -91,10 +90,16 @@ export const FinancePage = () => {
   const [activeTab, setActiveTab] = useState<'ledger' | 'requests'>('ledger');
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('all');
+  const [selectedDate, setSelectedDate] = useState('');
+
+  // Data
   const [ledgerItems, setLedgerItems] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]); // For filter dropdown
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -112,7 +117,7 @@ export const FinancePage = () => {
         setLedgerItems(ledgerData || []);
       }
 
-      // 2. Fetch Requests
+      // 2. Fetch Requests (Global)
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
@@ -126,13 +131,14 @@ export const FinancePage = () => {
       }
 
       const { data: reqData, error } = await reqQuery.order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Supabase Error:", error);
-        throw error;
-      }
-
+      if (error) throw error;
       setRequests(reqData || []);
+
+      // 3. Fetch Units List (For Admin Filters)
+      if (isAdmin) {
+        const { data: unitsData } = await supabase.from('units').select('id, name').order('name');
+        setUnits(unitsData || []);
+      }
 
     } catch (err) {
       console.error(err);
@@ -146,16 +152,32 @@ export const FinancePage = () => {
     fetchData();
   }, [profile?.unit_id, isAdmin]);
 
-  // Filter Logic
-  const filteredLedger = ledgerItems.filter(t =>
-    (t.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    t.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // --- FILTER LOGIC ---
+  const filterByUnitAndDate = (item: any, dateField: string) => {
+    // 1. Search Query
+    const searchMatch =
+      (item.purpose || item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.units?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-  const filteredRequests = requests.filter(r =>
-    (r.purpose?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (r.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-  );
+    if (!searchMatch) return false;
+
+    // 2. Unit Filter (Admin only)
+    if (isAdmin && selectedUnit !== 'all') {
+      // Handle both ledger (unit_id) and requests (unit_id)
+      if (item.unit_id !== selectedUnit) return false;
+    }
+
+    // 3. Date Filter
+    if (selectedDate) {
+      const itemDate = new Date(item[dateField]).toISOString().split('T')[0];
+      if (itemDate !== selectedDate) return false;
+    }
+
+    return true;
+  };
+
+  const filteredLedger = ledgerItems.filter(item => filterByUnitAndDate(item, 'date'));
+  const filteredRequests = requests.filter(item => filterByUnitAndDate(item, 'created_at'));
 
   // Stats (Unit Only)
   const totalIncome = ledgerItems.filter(t => t.type === 'income').reduce((a, c) => a + Number(c.amount), 0);
@@ -163,7 +185,7 @@ export const FinancePage = () => {
   const balance = totalIncome - totalExpense;
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
 
@@ -183,6 +205,62 @@ export const FinancePage = () => {
         )}
       </div>
 
+      {/* --- FILTERS BAR --- */}
+      <div className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+         <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder={isAdmin ? "Search by unit, purpose..." : "Search records..."}
+              className="h-10 w-full rounded-lg bg-slate-50 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 border border-slate-100"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+         </div>
+
+         <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            {/* UNIT FILTER (Admin Only) */}
+            {isAdmin && (
+              <select
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
+                value={selectedUnit}
+                onChange={e => setSelectedUnit(e.target.value)}
+              >
+                <option value="all">All Units</option>
+                {units.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            )}
+
+            {/* DATE FILTER */}
+            <input
+              type="date"
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+            />
+
+            {/* CLEAR FILTERS */}
+            {(selectedUnit !== 'all' || selectedDate || searchQuery) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 px-3 text-slate-500 hover:text-red-500"
+                onClick={() => { setSelectedUnit('all'); setSelectedDate(''); setSearchQuery(''); }}
+              >
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
+
+            {!isAdmin && profile?.role !== 'unit_pastor' && (
+               <Button size="sm" className="h-10" onClick={() => activeTab === 'ledger' ? setIsLedgerModalOpen(true) : setIsRequestModalOpen(true)}>
+                 <Plus className="mr-2 h-4 w-4" /> New
+               </Button>
+             )}
+         </div>
+      </div>
+
       {activeTab === 'ledger' && !isAdmin && (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -190,16 +268,13 @@ export const FinancePage = () => {
             <div className="rounded-xl border border-green-100 bg-green-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-green-600 mb-1"><TrendingUp className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Income</span></div><p className="text-2xl font-bold text-green-700">{formatCurrency(totalIncome)}</p></div>
             <div className="rounded-xl border border-red-100 bg-red-50/50 p-4 shadow-sm"><div className="flex items-center gap-2 text-red-600 mb-1"><TrendingDown className="h-4 w-4" /><span className="text-xs font-bold uppercase">Total Expense</span></div><p className="text-2xl font-bold text-red-700">{formatCurrency(totalExpense)}</p></div>
           </div>
-          <div className="flex justify-between items-center mt-4">
-             <div className="relative w-full max-w-xs"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input type="text" placeholder="Search ledger..." className="h-9 w-full rounded-lg bg-slate-50 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
-             {profile?.role === 'unit_head' && ( <Button size="sm" onClick={() => setIsLedgerModalOpen(true)}><Plus className="mr-2 h-4 w-4" /> Add Record</Button> )}
-          </div>
+
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
             {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
               <table className="w-full text-left text-sm">
                 <thead><tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold"><th className="px-4 py-3 w-12 text-center border-r border-slate-100">S/N</th><th className="px-4 py-3 w-24 text-center border-r border-slate-100">Type</th><th className="px-4 py-3 border-r border-slate-100">Item Name</th><th className="px-4 py-3 border-r border-slate-100">Category</th><th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th><th className="px-4 py-3 w-24 text-right">Date</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredLedger.length === 0 ? ( <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No records found.</td></tr> ) : ( filteredLedger.map((t, index) => (
+                  {filteredLedger.length === 0 ? ( <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No records found matching filters.</td></tr> ) : ( filteredLedger.map((t, index) => (
                       <tr key={t.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td><td className="px-4 py-3 text-center border-r border-slate-100">{t.type === 'income' ? <span className="inline-flex items-center gap-1 text-green-600"><ArrowUpRight className="h-3 w-3" /> In</span> : <span className="inline-flex items-center gap-1 text-red-600"><ArrowDownLeft className="h-3 w-3" /> Out</span>}</td><td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{t.title || "—"}</td><td className="px-4 py-3 text-slate-500 border-r border-slate-100">{t.category}</td><td className={`px-4 py-3 text-right font-mono font-bold border-r border-slate-100 ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'expense' && '- '}{formatCurrency(t.amount)}</td><td className="px-4 py-3 text-right text-slate-500 text-xs">{formatDate(t.date)}</td></tr>
                     )))}
                 </tbody>
@@ -211,13 +286,6 @@ export const FinancePage = () => {
 
       {activeTab === 'requests' && (
         <>
-          <div className="flex justify-between items-center mt-4">
-             <div className="relative w-full max-w-xs"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input type="text" placeholder={isAdmin ? "Search units or requests..." : "Search requests..."} className="h-9 w-full rounded-lg bg-slate-50 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
-
-             {!isAdmin && profile?.role !== 'unit_pastor' && (
-               <Button size="sm" onClick={() => setIsRequestModalOpen(true)}><Send className="mr-2 h-4 w-4" /> New Request</Button>
-             )}
-          </div>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
             {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
               <table className="w-full text-left text-sm">
@@ -231,7 +299,7 @@ export const FinancePage = () => {
                   <th className="px-4 py-3 w-24 text-right">Date</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredRequests.length === 0 ? ( <tr><td colSpan={isAdmin ? 7 : 6} className="px-6 py-8 text-center text-slate-500">No requests found.</td></tr> ) : ( filteredRequests.map((req, index) => (
+                  {filteredRequests.length === 0 ? ( <tr><td colSpan={isAdmin ? 7 : 6} className="px-6 py-8 text-center text-slate-500">No requests found matching filters.</td></tr> ) : ( filteredRequests.map((req, index) => (
                       <tr key={req.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td>
 
@@ -252,11 +320,8 @@ export const FinancePage = () => {
                         </td>
                         <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{req.purpose || req.title}</td>
 
-                        {/* --- DETAILS COLUMN: SHOW DESCRIPTION + ADMIN COMMENT --- */}
                         <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[200px]" title={req.description}>
                           <div className="truncate mb-1">{req.description || "—"}</div>
-
-                          {/* VISUAL INDICATOR FOR ADMIN COMMENT */}
                           {req.admin_comment && (
                             <div className="mt-1 flex items-start gap-1 bg-amber-50 border border-amber-100 p-1.5 rounded-md text-[10px] text-amber-800">
                                <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />

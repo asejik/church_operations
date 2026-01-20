@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Plus, Search, Package, AlertTriangle, CheckCircle, HelpCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, CheckCircle, HelpCircle, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
@@ -12,11 +12,18 @@ export const InventoryPage = () => {
   const isAdmin = profile?.role === 'admin_pastor';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  // Data
   const [items, setItems] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // FETCH DATA (Online First)
+  // FETCH DATA
   const fetchInventory = async () => {
     if (!profile) return;
 
@@ -33,6 +40,12 @@ export const InventoryPage = () => {
 
       if (error) throw error;
       setItems(data || []);
+
+      // Fetch Units for Admin Filter
+      if (isAdmin) {
+        const { data: unitsData } = await supabase.from('units').select('id, name').order('name');
+        setUnits(unitsData || []);
+      }
 
     } catch (err) {
       console.error(err);
@@ -59,12 +72,29 @@ export const InventoryPage = () => {
     return <AlertTriangle className="mr-1.5 h-3 w-3" />;
   };
 
-  // Client-side filtering
-  const filteredItems = items.filter(item =>
-    (item.item_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (item.notes?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (item.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) // Allow admin search by unit
-  );
+  // --- FILTER & SORT LOGIC ---
+  const filteredItems = items
+    .filter(item => {
+      // 1. Search Query
+      const matchesSearch =
+        (item.item_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (item.notes?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (item.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      // 2. Unit Filter
+      if (isAdmin && selectedUnit !== 'all') {
+        if (item.unit_id !== selectedUnit) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
 
@@ -75,23 +105,64 @@ export const InventoryPage = () => {
           <h1 className="text-2xl font-bold text-slate-900">{isAdmin ? 'Global Inventory' : 'Inventory'}</h1>
           <p className="text-slate-500">{isAdmin ? 'View equipment across all units' : 'Manage unit equipment'}</p>
         </div>
-        {/* Only Unit Head/Editor can add items. Admin cannot. */}
-        {!isAdmin && profile?.role !== 'unit_pastor' && (
-          <Button onClick={() => setIsAddOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Item
-          </Button>
-        )}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-        <input
-          type="text"
-          placeholder={isAdmin ? "Search equipment or units..." : "Search equipment..."}
-          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+      {/* --- FILTER BAR --- */}
+      <div className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+         <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder={isAdmin ? "Search equipment or units..." : "Search equipment..."}
+              className="h-10 w-full rounded-lg bg-slate-50 pl-9 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100 border border-slate-100"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+         </div>
+
+         <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            {/* UNIT FILTER (Admin Only) */}
+            {isAdmin && (
+              <select
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
+                value={selectedUnit}
+                onChange={e => setSelectedUnit(e.target.value)}
+              >
+                <option value="all">All Units</option>
+                {units.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            )}
+
+            {/* SORT ORDER */}
+            <select
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as 'newest' | 'oldest')}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+            </select>
+
+            {/* CLEAR FILTERS */}
+            {(selectedUnit !== 'all' || searchQuery || sortOrder !== 'newest') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 px-3 text-slate-500 hover:text-red-500"
+                onClick={() => { setSelectedUnit('all'); setSortOrder('newest'); setSearchQuery(''); }}
+              >
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
+
+            {!isAdmin && profile?.role !== 'unit_pastor' && (
+              <Button size="sm" className="h-10" onClick={() => setIsAddOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Item
+              </Button>
+            )}
+         </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -115,7 +186,7 @@ export const InventoryPage = () => {
                    <tr>
                      <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center text-slate-500">
                        <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
-                       No items found.
+                       No items found matching filters.
                      </td>
                    </tr>
                 ) : (
