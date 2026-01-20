@@ -6,7 +6,8 @@ import { Toaster } from 'sonner';
 
 // Layouts
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { AdminLayout } from "@/components/layout/AdminLayout"; // <--- NEW IMPORT
+import { AdminLayout } from "@/components/layout/AdminLayout";
+import { EvangelismLayout } from "@/components/layout/EvangelismLayout"; // <--- NEW IMPORT
 
 // Unit Dashboard Pages
 import { MembersPage } from "@/pages/dashboard/Members";
@@ -19,9 +20,13 @@ import { DashboardHome } from "@/pages/dashboard/Home";
 import { SettingsPage } from "@/pages/dashboard/Settings";
 
 // Admin Pages
-import { AdminDashboard } from "@/pages/admin/AdminDashboard"; // <--- NEW IMPORT
+import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 
-// Simple Landing Page Component (Preserved)
+// Evangelism Pages
+import { EvangelismOverview } from "@/pages/evangelism/EvangelismOverview";
+import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
+
+// Simple Landing Page Component
 const LandingPage = () => {
   const navigate = useNavigate();
   return (
@@ -79,14 +84,17 @@ function App() {
           {/* ADMIN PORTAL ROUTES (Pastor Queen) */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
-
-            {/* REUSING COMPONENTS:
-              Because we updated the RLS policies, Pastor Queen can view ALL data.
-              We can reuse the same pages here. The "Add" buttons will auto-hide
-              because her role is 'admin_pastor', not 'unit_head'.
-            */}
             <Route path="finance" element={<FinancePage />} />
             <Route path="inventory" element={<InventoryPage />} />
+          </Route>
+
+          {/* EVANGELISM OVERSIGHT ROUTES */}
+          <Route path="/evangelism" element={<EvangelismLayout />}>
+            {/* 1. Overview Page (Stats only) */}
+            <Route index element={<EvangelismOverview />} />
+
+            {/* 2. Reports Page (Table only) */}
+            <Route path="reports" element={<EvangelismReports />} />
           </Route>
 
         </Routes>

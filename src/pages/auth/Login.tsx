@@ -39,6 +39,8 @@ export const LoginPage = () => {
       // 3. Smart Redirect
       if (profile?.role === 'admin_pastor') {
         navigate('/admin');
+      } else if (profile?.role === 'evangelism_oversight') {
+        navigate('/evangelism');
       } else {
         navigate('/dashboard');
       }
