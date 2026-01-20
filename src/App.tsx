@@ -2,9 +2,14 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-route
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/auth/Login";
 import { motion } from "framer-motion";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { MembersPage } from "@/pages/dashboard/Members";
 import { Toaster } from 'sonner';
+
+// Layouts
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AdminLayout } from "@/components/layout/AdminLayout"; // <--- NEW IMPORT
+
+// Unit Dashboard Pages
+import { MembersPage } from "@/pages/dashboard/Members";
 import { AttendancePage } from "@/pages/dashboard/Attendance";
 import { FinancePage } from "@/pages/dashboard/Finance";
 import { InventoryPage } from "@/pages/dashboard/Inventory";
@@ -13,10 +18,10 @@ import { SoulsPage } from "@/pages/dashboard/Souls";
 import { DashboardHome } from "@/pages/dashboard/Home";
 import { SettingsPage } from "@/pages/dashboard/Settings";
 
-// ... inside Routes
-<Route path="souls" element={<SoulsPage />} />
+// Admin Pages
+import { AdminDashboard } from "@/pages/admin/AdminDashboard"; // <--- NEW IMPORT
 
-// Simple Landing Page Component
+// Simple Landing Page Component (Preserved)
 const LandingPage = () => {
   const navigate = useNavigate();
   return (
@@ -55,25 +60,33 @@ function App() {
       <AppLayout>
         <Toaster position="top-right" richColors />
         <Routes>
+          {/* PUBLIC ROUTES */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* PROTECTED DASHBOARD ROUTES */}
+          {/* UNIT DASHBOARD ROUTES (Unit Heads & Pastors) */}
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
-            <Route index element={<div className="text-2xl font-bold text-slate-800">Welcome to your Dashboard</div>} />
-
-            {/* FIXED: Removed the placeholder "Attendance Page" div that was here */}
-
             <Route path="finance" element={<FinancePage />} />
             <Route path="members" element={<MembersPage />} />
-
-            {/* This is the correct component */}
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="souls" element={<SoulsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          {/* ADMIN PORTAL ROUTES (Pastor Queen) */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+
+            {/* REUSING COMPONENTS:
+              Because we updated the RLS policies, Pastor Queen can view ALL data.
+              We can reuse the same pages here. The "Add" buttons will auto-hide
+              because her role is 'admin_pastor', not 'unit_head'.
+            */}
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="inventory" element={<InventoryPage />} />
           </Route>
 
         </Routes>

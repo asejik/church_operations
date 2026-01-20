@@ -9,6 +9,8 @@ import { AddItemModal } from '@/components/inventory/AddItemModal';
 // --- MAIN PAGE ---
 export const InventoryPage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
+  const isAdmin = profile?.role === 'admin_pastor';
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState<any[]>([]);
@@ -16,15 +18,18 @@ export const InventoryPage = () => {
 
   // FETCH DATA (Online First)
   const fetchInventory = async () => {
-    if (!profile?.unit_id) return;
+    if (!profile) return;
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('unit_id', profile.unit_id)
-        .order('created_at', { ascending: false });
+      let query = supabase.from('inventory').select('*, units(name)'); // Join unit name
+
+      // ADMIN: Fetch ALL.  OTHERS: Fetch UNIT only.
+      if (!isAdmin) {
+        query = query.eq('unit_id', profile.unit_id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setItems(data || []);
@@ -39,7 +44,7 @@ export const InventoryPage = () => {
 
   useEffect(() => {
     fetchInventory();
-  }, [profile?.unit_id]);
+  }, [profile?.unit_id, isAdmin]);
 
   const getConditionBadge = (c: string) => {
     if (c === 'new' || c === 'good') return 'bg-green-100 text-green-700 border-green-200';
@@ -57,7 +62,8 @@ export const InventoryPage = () => {
   // Client-side filtering
   const filteredItems = items.filter(item =>
     (item.item_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (item.notes?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    (item.notes?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (item.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) // Allow admin search by unit
   );
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
@@ -66,11 +72,11 @@ export const InventoryPage = () => {
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
-          <p className="text-slate-500">Manage unit equipment</p>
+          <h1 className="text-2xl font-bold text-slate-900">{isAdmin ? 'Global Inventory' : 'Inventory'}</h1>
+          <p className="text-slate-500">{isAdmin ? 'View equipment across all units' : 'Manage unit equipment'}</p>
         </div>
-        {/* Only Unit Head/Editor can add items */}
-        {profile?.role !== 'unit_pastor' && (
+        {/* Only Unit Head/Editor can add items. Admin cannot. */}
+        {!isAdmin && profile?.role !== 'unit_pastor' && (
           <Button onClick={() => setIsAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add Item
           </Button>
@@ -81,7 +87,7 @@ export const InventoryPage = () => {
         <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Search equipment..."
+          placeholder={isAdmin ? "Search equipment or units..." : "Search equipment..."}
           className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-100"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
@@ -97,6 +103,7 @@ export const InventoryPage = () => {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
                   <th className="px-4 py-4 w-12 border-r border-slate-100">S/N</th>
+                  {isAdmin && <th className="px-4 py-4 border-r border-slate-100">Unit</th>}
                   <th className="px-4 py-4 border-r border-slate-100">Item Name</th>
                   <th className="px-4 py-4 border-r border-slate-100">Condition</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center">Qty</th>
@@ -106,7 +113,7 @@ export const InventoryPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.length === 0 ? (
                    <tr>
-                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                     <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center text-slate-500">
                        <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
                        No items found.
                      </td>
@@ -117,6 +124,11 @@ export const InventoryPage = () => {
                       <td className="px-4 py-3 text-center text-slate-400 text-xs border-r border-slate-100">
                         {(i + 1).toString().padStart(2, '0')}
                       </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 font-medium text-slate-900 border-r border-slate-100">
+                          {item.units?.name}
+                        </td>
+                      )}
                       <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
                         {item.item_name}
                       </td>

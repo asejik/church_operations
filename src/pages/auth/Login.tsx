@@ -1,4 +1,3 @@
-// src/pages/auth/Login.tsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
@@ -22,15 +21,28 @@ export const LoginPage = () => {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // 1. Authenticate
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
-      // Successful login
-      navigate('/dashboard');
+      // 2. Check Profile Role for Redirect
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .single();
+
+      // 3. Smart Redirect
+      if (profile?.role === 'admin_pastor') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
+
     } catch (err: any) {
       setError(err.message || "An error occurred during login");
     } finally {
