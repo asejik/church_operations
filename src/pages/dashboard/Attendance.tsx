@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/Button';
-import { Plus, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, Pencil } from 'lucide-react';
+import { Plus, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, Pencil, Building2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { NewSessionModal } from '@/components/dashboard/NewSessionModal';
@@ -10,45 +10,74 @@ import { NewSessionModal } from '@/components/dashboard/NewSessionModal';
 export const AttendancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
-  // VIEW STATE
+  // --- 1. ROLE LOGIC ---
+  // SMR and Admin Pastors are "Global Viewers"
+  const isGlobalViewer = profile?.role === 'smr' || profile?.role === 'admin_pastor';
+  // Only Unit Heads can EDIT data
+  const isEditor = profile?.role === 'unit_head';
+
+  // --- 2. VIEW STATE ---
   const [viewMode, setViewMode] = useState<'matrix' | 'history'>('matrix');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // DATA STATE
+  // --- 3. DATA STATE ---
+  const [units, setUnits] = useState<any[]>([]); // For Dropdown
+  const [selectedUnitId, setSelectedUnitId] = useState<string>(""); // The unit we are currently viewing
+
   const [members, setMembers] = useState<any[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // MODAL STATE
+  // --- 4. MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editSessionDate, setEditSessionDate] = useState<string | undefined>(undefined);
   const [editSessionStatuses, setEditSessionStatuses] = useState<Record<string, 'present' | 'absent'> | undefined>(undefined);
 
-  // ROLE CHECK: Is the user allowed to Edit? (Only Unit Heads)
-  const isEditor = profile?.role === 'unit_head';
+  // --- EFFECT: INITIALIZE UNIT SELECTION ---
+  useEffect(() => {
+    const initUnits = async () => {
+      if (!profile) return;
 
+      if (isGlobalViewer) {
+        // Fetch ALL units for the dropdown
+        const { data } = await supabase.from('units').select('id, name').order('name');
+        if (data && data.length > 0) {
+          setUnits(data);
+          // Default to the first unit so the screen isn't empty
+          if (!selectedUnitId) setSelectedUnitId(data[0].id);
+        }
+      } else if (profile.unit_id) {
+        // Regular User: Lock to their own unit
+        setSelectedUnitId(profile.unit_id);
+      }
+    };
+    initUnits();
+  }, [profile, isGlobalViewer]);
+
+  // --- EFFECT: FETCH ATTENDANCE DATA ---
   const fetchData = async () => {
-    if (!profile?.unit_id) return;
+    // Wait until we have a target unit ID (either from profile or selection)
+    if (!selectedUnitId) return;
 
     setDataLoading(true);
     try {
-      // A. Fetch Members
+      // A. Fetch Members for the SELECTED Unit
       const { data: memberData, error: memberError } = await supabase
         .from('members')
         .select('id, full_name')
-        .eq('unit_id', profile.unit_id)
+        .eq('unit_id', selectedUnitId) // <--- Use Selected ID
         .order('full_name');
 
       if (memberError) throw memberError;
 
-      // B. Fetch Logs
+      // B. Fetch Logs for the SELECTED Unit
       const start = startOfMonth(currentDate).toISOString();
       const end = endOfMonth(currentDate).toISOString();
 
       const { data: logsData, error: logsError } = await supabase
         .from('attendance')
         .select('*')
-        .eq('unit_id', profile.unit_id)
+        .eq('unit_id', selectedUnitId) // <--- Use Selected ID
         .gte('event_date', start)
         .lte('event_date', end);
 
@@ -65,14 +94,14 @@ export const AttendancePage = () => {
     }
   };
 
+  // Re-fetch when Unit changes or Date changes
   useEffect(() => {
-    if (profile?.unit_id) {
-      fetchData();
-    }
-  }, [profile?.unit_id, currentDate]);
+    fetchData();
+  }, [selectedUnitId, currentDate]);
 
+  // --- HELPER FUNCTIONS ---
   const handleEditSession = (dateStr: string) => {
-    if (!isEditor) return; // Guard
+    if (!isEditor) return;
     const logs = attendanceLogs.filter(l => l.event_date === dateStr);
     const statuses: Record<string, 'present' | 'absent'> = {};
     logs.forEach(l => {
@@ -120,40 +149,58 @@ export const AttendancePage = () => {
   };
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
-  if (!profile?.unit_id) return <div className="text-center py-10 text-slate-400">Unit profile not found.</div>;
 
   return (
     <div className="space-y-6">
       {/* HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-           <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
-           <p className="text-slate-500">Track presence and consistency</p>
+        <div className="space-y-2">
+           <div>
+             <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
+             <p className="text-slate-500">Track presence and consistency</p>
+           </div>
+
+           {/* GLOBAL UNIT SELECTOR (Only for SMR/Admin) */}
+           {isGlobalViewer && (
+             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-lg w-fit">
+               <Building2 className="h-4 w-4 text-amber-600 ml-2" />
+               <select
+                 className="bg-transparent border-none text-sm font-bold text-amber-900 focus:ring-0 cursor-pointer min-w-[200px]"
+                 value={selectedUnitId}
+                 onChange={(e) => setSelectedUnitId(e.target.value)}
+               >
+                 {units.map(u => (
+                   <option key={u.id} value={u.id}>{u.name}</option>
+                 ))}
+               </select>
+             </div>
+           )}
         </div>
 
-        {/* CONTROLS (Only visible to Editor/Unit Head) */}
-        {isEditor && (
-          <div className="flex items-center gap-4">
+        {/* CONTROLS (View Mode + Actions) */}
+        <div className="flex items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-lg">
               <button
                 onClick={() => setViewMode('matrix')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'matrix' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
               >
-                <LayoutGrid className="h-4 w-4" /> Matrix
+                <LayoutGrid className="h-4 w-4" /> <span className="hidden sm:inline">Matrix</span>
               </button>
               <button
                 onClick={() => setViewMode('history')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'history' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
               >
-                <List className="h-4 w-4" /> History
+                <List className="h-4 w-4" /> <span className="hidden sm:inline">History</span>
               </button>
             </div>
 
-            <Button onClick={handleNewSession}>
-              <Plus className="mr-2 h-4 w-4" /> New Session
-            </Button>
-          </div>
-        )}
+            {/* Only Unit Heads can create new sessions */}
+            {isEditor && (
+              <Button onClick={handleNewSession}>
+                <Plus className="mr-2 h-4 w-4" /> New Session
+              </Button>
+            )}
+        </div>
       </div>
 
       {/* MONTH NAV */}
@@ -172,11 +219,14 @@ export const AttendancePage = () => {
         {dataLoading ? (
            <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
         ) : members.length === 0 ? (
-           <div className="text-center py-12 text-slate-400">No members found.</div>
+           <div className="text-center py-12 text-slate-400 border rounded-xl border-dashed">
+             <p>No members found in {isGlobalViewer ? "this unit" : "your unit"}.</p>
+             {isGlobalViewer && <p className="text-xs mt-1">Try selecting a different unit above.</p>}
+           </div>
         ) : (
            <>
-             {/* MATRIX VIEW (Default for everyone) */}
-             {(viewMode === 'matrix' || !isEditor) && (
+             {/* MATRIX VIEW */}
+             {viewMode === 'matrix' && (
                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                  <div className="overflow-x-auto">
                    <table className="w-full text-left text-sm whitespace-nowrap">
@@ -225,8 +275,8 @@ export const AttendancePage = () => {
                </div>
              )}
 
-             {/* HISTORY VIEW (Editors Only) */}
-             {viewMode === 'history' && isEditor && (
+             {/* HISTORY VIEW */}
+             {viewMode === 'history' && (
                <div className="space-y-3">
                  {eventDates.length === 0 ? (
                    <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">No sessions recorded for {format(currentDate, 'MMMM')}.</div>
@@ -257,9 +307,11 @@ export const AttendancePage = () => {
                            </div>
                          </div>
 
-                         <Button variant="outline" size="sm" onClick={() => handleEditSession(date)}>
-                           <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                         </Button>
+                         {isEditor && (
+                           <Button variant="outline" size="sm" onClick={() => handleEditSession(date)}>
+                             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                           </Button>
+                         )}
                        </div>
                      )
                    })
@@ -273,7 +325,7 @@ export const AttendancePage = () => {
       <NewSessionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        unitId={profile.unit_id}
+        unitId={selectedUnitId} // <--- UPDATED: Uses the selected unit ID (safe for SMR)
         members={members}
         onSuccess={handleSessionSaved}
         defaultDate={editSessionDate}

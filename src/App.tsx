@@ -28,6 +28,7 @@ import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
 
 import { SMRLayout } from "@/components/layout/SMRLayout";
 import { SMRDashboard } from "@/pages/smr/SMRDashboard";
+import { SMRReports } from "@/pages/smr/SMRReports";
 
 // Simple Landing Page Component
 const LandingPage = () => {
@@ -103,6 +104,7 @@ function App() {
           {/* SMR PORTAL ROUTES (Pastor IBK & Dami) */}
           <Route path="/smr" element={<SMRLayout />}>
             <Route index element={<SMRDashboard />} />
+            <Route path="reports" element={<SMRReports />} /> {/* <--- NEW ROUTE */}
             {/* Reuse existing pages but they will show GLOBAL data because of 'is_smr()' policy */}
             <Route path="finance" element={<FinancePage />} />
             <Route path="souls" element={<EvangelismOverview />} /> {/* Reuse Overview */}

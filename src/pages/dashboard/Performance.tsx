@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Star, User, MessageSquare, BarChart2, Loader2 } from 'lucide-react';
+import { Plus, Search, Star, User, MessageSquare, BarChart2, Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 
@@ -28,8 +28,7 @@ const StarInput = ({ label, value, onChange }: { label: string, value: number, o
 );
 
 // --- MODAL: ADD REVIEW (ONLINE ONLY) ---
-const AddReviewModal = ({ isOpen, onClose, onComplete, members }: { isOpen: boolean; onClose: () => void; onComplete: () => void, members: any[] }) => {
-  const { data: profile } = useProfile();
+const AddReviewModal = ({ isOpen, onClose, onComplete, members, unitId }: { isOpen: boolean; onClose: () => void; onComplete: () => void, members: any[], unitId: string }) => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -44,14 +43,14 @@ const AddReviewModal = ({ isOpen, onClose, onComplete, members }: { isOpen: bool
   });
 
   const handleSubmit = async () => {
-    if (!profile?.unit_id || !formData.member_id) {
+    if (!unitId || !formData.member_id) {
       toast.error("Please select a member");
       return;
     }
     setLoading(true);
     try {
       const { error } = await supabase.from('performance_reviews').insert({
-        unit_id: profile.unit_id,
+        unit_id: unitId,
         member_id: formData.member_id,
         rating_punctuality: formData.rating_punctuality,
         rating_availability: formData.rating_availability,
@@ -67,7 +66,6 @@ const AddReviewModal = ({ isOpen, onClose, onComplete, members }: { isOpen: bool
       toast.success("Review saved successfully");
       onComplete();
       onClose();
-      // Reset Form
       setFormData(prev => ({
         ...prev,
         member_id: '',
@@ -147,24 +145,53 @@ const AddReviewModal = ({ isOpen, onClose, onComplete, members }: { isOpen: bool
 // --- MAIN PAGE ---
 export const PerformancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
+
+  // --- 1. ROLE LOGIC ---
+  const isGlobalViewer = profile?.role === 'smr' || profile?.role === 'admin_pastor';
+  // Only Unit Heads can ADD reviews
+  const isEditor = profile?.role === 'unit_head';
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('');
+
+  // --- 2. DATA STATE ---
+  const [units, setUnits] = useState<any[]>([]); // For Dropdown
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
 
   const [reviews, setReviews] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // FETCH DATA (Online First)
+  // --- 3. INITIALIZE UNIT SELECTION ---
+  useEffect(() => {
+    const initUnits = async () => {
+      if (!profile) return;
+      if (isGlobalViewer) {
+        // Fetch ALL units
+        const { data } = await supabase.from('units').select('id, name').order('name');
+        if (data && data.length > 0) {
+          setUnits(data);
+          if (!selectedUnitId) setSelectedUnitId(data[0].id);
+        }
+      } else if (profile.unit_id) {
+        // Lock to own unit
+        setSelectedUnitId(profile.unit_id);
+      }
+    };
+    initUnits();
+  }, [profile, isGlobalViewer]);
+
+  // --- 4. FETCH DATA ---
   const fetchData = async () => {
-    if (!profile?.unit_id) return;
+    if (!selectedUnitId) return;
     setLoading(true);
     try {
-      // 1. Fetch Members (for names/images)
+      // 1. Fetch Members
       const { data: memberData } = await supabase
         .from('members')
-        .select('id, full_name, image_url') // Added image_url if you have it
-        .eq('unit_id', profile.unit_id);
+        .select('id, full_name, image_url')
+        .eq('unit_id', selectedUnitId);
 
       setMembers(memberData || []);
 
@@ -172,7 +199,7 @@ export const PerformancePage = () => {
       const { data: reviewData } = await supabase
         .from('performance_reviews')
         .select('*')
-        .eq('unit_id', profile.unit_id)
+        .eq('unit_id', selectedUnitId)
         .order('review_date', { ascending: false });
 
       setReviews(reviewData || []);
@@ -187,9 +214,9 @@ export const PerformancePage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [profile?.unit_id]);
+  }, [selectedUnitId]);
 
-  // PROCESS DATA (Grouping by Month)
+  // --- 5. PROCESS DATA (Grouping by Month) ---
   const processedData = useMemo(() => {
     if (reviews.length === 0 || members.length === 0) return { months: [], grouped: {} };
 
@@ -213,17 +240,16 @@ export const PerformancePage = () => {
       grouped[monthKey].push({
         ...r,
         member_name: member.full_name,
-        // member_img: member.image_url, // Uncomment if you have images
         average_score: avg.toFixed(1)
       });
     });
 
-    const sortedMonths = Array.from(monthsSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()); // Newest months first
+    const sortedMonths = Array.from(monthsSet).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
     return { months: sortedMonths, grouped };
   }, [reviews, members, searchQuery]);
 
-  // Set default tab to newest month
+  // Set default tab
   useEffect(() => {
     if (!activeTab && processedData.months.length > 0) {
       setActiveTab(processedData.months[0]);
@@ -243,9 +269,34 @@ export const PerformancePage = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-slate-900">Performance</h1><p className="text-slate-500">Holistic member evaluation</p></div>
-        {profile?.role !== 'unit_pastor' && (
+
+      {/* HEADER & UNIT SELECTOR */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-2">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Performance</h1>
+              <p className="text-slate-500">Holistic member evaluation</p>
+            </div>
+
+            {/* UNIT SELECTOR (Global Viewers Only) */}
+            {isGlobalViewer && (
+             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-lg w-fit">
+               <Building2 className="h-4 w-4 text-amber-600 ml-2" />
+               <select
+                 className="bg-transparent border-none text-sm font-bold text-amber-900 focus:ring-0 cursor-pointer min-w-[200px]"
+                 value={selectedUnitId}
+                 onChange={(e) => setSelectedUnitId(e.target.value)}
+               >
+                 {units.map(u => (
+                   <option key={u.id} value={u.id}>{u.name}</option>
+                 ))}
+               </select>
+             </div>
+           )}
+        </div>
+
+        {/* ADD BUTTON (Unit Heads Only) */}
+        {isEditor && (
           <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Review</Button>
         )}
       </div>
@@ -281,7 +332,15 @@ export const PerformancePage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {currentReviews.length === 0 ? (
-                   <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-500"><div className="flex flex-col items-center"><MessageSquare className="h-10 w-10 text-slate-300 mb-2" /><p>No reviews found for this month.</p></div></td></tr>
+                   <tr>
+                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                       <div className="flex flex-col items-center">
+                         <MessageSquare className="h-10 w-10 text-slate-300 mb-2" />
+                         <p>No reviews found for {activeTab || "this unit"}.</p>
+                         {isGlobalViewer && <p className="text-xs mt-1">Select a unit to view their performance logs.</p>}
+                       </div>
+                     </td>
+                   </tr>
                 ) : (
                   currentReviews.map((review, i) => (
                     <tr key={review.id} className="hover:bg-slate-50 transition-colors">
@@ -325,12 +384,12 @@ export const PerformancePage = () => {
         </div>
       </div>
 
-      {/* Pass members to the modal so it doesn't need to fetch them again */}
       <AddReviewModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onComplete={fetchData}
         members={members}
+        unitId={selectedUnitId} // Pass selected unit to modal
       />
     </div>
   );

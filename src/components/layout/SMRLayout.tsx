@@ -12,7 +12,8 @@ import {
   Users,
   Heart,
   BarChart3,
-  Package
+  Package,
+  PieChart
 } from 'lucide-react';
 
 export const SMRLayout = () => {
@@ -28,6 +29,7 @@ export const SMRLayout = () => {
 
   const navItems = [
     { label: 'Executive Overview', path: '/smr', icon: LayoutDashboard },
+    { label: 'Statistical Reports', path: '/smr/reports', icon: PieChart },
     { label: 'Global Finances', path: '/smr/finance', icon: Wallet },
     { label: 'Soul Center', path: '/smr/souls', icon: Heart },
     { label: 'Attendance', path: '/smr/attendance', icon: Users },
