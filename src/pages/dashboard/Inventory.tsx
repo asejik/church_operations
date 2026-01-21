@@ -6,42 +6,35 @@ import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 
-// --- MAIN PAGE ---
 export const InventoryPage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const isAdmin = profile?.role === 'admin_pastor';
+
+  // FIX: SMR counts as Admin for Global View
+  const isAdmin = profile?.role === 'admin_pastor' || profile?.role === 'smr';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
-
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-  // Data
   const [items, setItems] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // FETCH DATA
   const fetchInventory = async () => {
     if (!profile) return;
-
     setLoading(true);
     try {
-      let query = supabase.from('inventory').select('*, units(name)'); // Join unit name
+      let query = supabase.from('inventory').select('*, units(name)');
 
-      // ADMIN: Fetch ALL.  OTHERS: Fetch UNIT only.
       if (!isAdmin) {
         query = query.eq('unit_id', profile.unit_id);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
-
       if (error) throw error;
       setItems(data || []);
 
-      // Fetch Units for Admin Filter
       if (isAdmin) {
         const { data: unitsData } = await supabase.from('units').select('id, name').order('name');
         setUnits(unitsData || []);
@@ -59,11 +52,14 @@ export const InventoryPage = () => {
     fetchInventory();
   }, [profile?.unit_id, isAdmin]);
 
+  // ... (Remainder of the file logic for getConditionBadge, getConditionIcon, and filteredItems remains exactly the same)
+  // To keep the response concise, I'm pasting the FULL logic below for safety.
+
   const getConditionBadge = (c: string) => {
     if (c === 'new' || c === 'good') return 'bg-green-100 text-green-700 border-green-200';
     if (c === 'fair') return 'bg-blue-50 text-blue-700 border-blue-100';
     if (c === 'faulty' || c === 'bad') return 'bg-red-50 text-red-700 border-red-100';
-    return 'bg-amber-50 text-amber-700 border-amber-100'; // under_repair
+    return 'bg-amber-50 text-amber-700 border-amber-100';
   };
 
   const getConditionIcon = (c: string) => {
@@ -72,21 +68,15 @@ export const InventoryPage = () => {
     return <AlertTriangle className="mr-1.5 h-3 w-3" />;
   };
 
-  // --- FILTER & SORT LOGIC ---
   const filteredItems = items
     .filter(item => {
-      // 1. Search Query
       const matchesSearch =
         (item.item_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (item.notes?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
         (item.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
       if (!matchesSearch) return false;
-
-      // 2. Unit Filter
-      if (isAdmin && selectedUnit !== 'all') {
-        if (item.unit_id !== selectedUnit) return false;
-      }
+      if (isAdmin && selectedUnit !== 'all' && item.unit_id !== selectedUnit) return false;
 
       return true;
     })
@@ -107,7 +97,6 @@ export const InventoryPage = () => {
         </div>
       </div>
 
-      {/* --- FILTER BAR --- */}
       <div className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
          <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -121,7 +110,6 @@ export const InventoryPage = () => {
          </div>
 
          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            {/* UNIT FILTER (Admin Only) */}
             {isAdmin && (
               <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
@@ -135,7 +123,6 @@ export const InventoryPage = () => {
               </select>
             )}
 
-            {/* SORT ORDER */}
             <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
                 value={sortOrder}
@@ -145,7 +132,6 @@ export const InventoryPage = () => {
                 <option value="oldest">Oldest First</option>
             </select>
 
-            {/* CLEAR FILTERS */}
             {(selectedUnit !== 'all' || searchQuery || sortOrder !== 'newest') && (
               <Button
                 variant="ghost"
@@ -223,7 +209,6 @@ export const InventoryPage = () => {
           )}
         </div>
       </div>
-
       <AddItemModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}

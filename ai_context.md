@@ -80,3 +80,65 @@ All modules are now **Online-First** and Role-Aware.
 
 ## 5. Upcoming Tasks
 -   **SMR Dashboard**: Build the Statistical Management Report dashboard (Next Session).
+
+---
+
+# Project Status & Architecture Map
+Last Updated: January 21, 2026 (SMR Portal & Global Logic Complete)
+
+## 1. Core Architecture: Online-First
+- **Database**: Supabase (PostgreSQL) is the Single Source of Truth.
+- **Client State**: React Query / Direct Fetching.
+- **Security Strategy**: Tiered RLS with "Circuit Breaker" functions (`is_admin`, `is_evangelist`, `is_smr`).
+
+## 2. Role-Based Access Control (RBAC)
+We use a **Tiered Permission System** enforced by Database Policies:
+
+* **Tier 0: Set Man Representative (SMR) - (e.g., Pastor IBK, Pastor Dami)**
+    * **Access**: Universal Access (Finance, Souls, Inventory, Attendance, Members) across ALL units.
+    * **UI**: `SMRLayout` (Gold Theme) -> `/smr`
+    * **Mechanism**: `is_smr()` function bypasses all RLS restrictions.
+    * **Logic**: Reuses Finance/Inventory pages with `isAdmin = role === 'smr'`.
+
+* **Tier 1: Admin Pastor (e.g., Pastor Queen)**
+    * **Access**: Global view of Finances & Inventory.
+    * **Restriction**: Cannot view Attendance, Souls, or Performance of other units.
+    * **UI**: `AdminLayout` (Dark Theme) -> `/admin`
+
+* **Tier 2: Evangelism Oversight (e.g., Evangelist Chuks)**
+    * **Access**: Global view of Soul Reports.
+    * **UI**: `EvangelismLayout` (Pink Theme) -> `/evangelism`
+
+* **Tier 3: Unit Head**
+    * **Access**: Full CRUD for their OWN unit only.
+    * **UI**: `DashboardLayout` (Light Theme) -> `/dashboard`
+
+## 3. File Map & Features
+
+### **A. SMR Portal (New Jan 21)**
+- **Layout**: `src/components/layout/SMRLayout.tsx` (Gold/Amber Theme).
+- **Dashboard**: `src/pages/smr/SMRDashboard.tsx` (Executive Summary: Net Position, Total Souls, Workforce).
+
+### **B. Evangelism Portal**
+- **Overview**: `src/pages/evangelism/EvangelismOverview.tsx` (Stats).
+- **Reports**: `src/pages/evangelism/EvangelismReports.tsx` (Data Table).
+
+### **C. Shared Modules (Role-Aware)**
+These pages adapt based on `isAdmin` check (`admin_pastor` OR `smr`):
+1.  **Finances**: `src/pages/dashboard/Finance.tsx`
+    -   *SMR/Admin*: Global Requests View.
+    -   *Unit Head*: Unit Ledger View.
+2.  **Inventory**: `src/pages/dashboard/Inventory.tsx`
+    -   *SMR/Admin*: All Units.
+    -   *Unit Head*: Own Unit.
+3.  **Souls**: `src/pages/dashboard/Souls.tsx` (Unit View).
+    -   *Global View*: Handled by `EvangelismOverview`.
+
+## 4. Database Schema Updates
+-   **Profiles**: `role` column now supports `'smr'`.
+-   **Functions**: Added `is_smr()` for super-admin security policies.
+-   **Policies**: Updated `finances`, `inventory`, `soul_reports`, and `profiles` to allow `is_smr()` full access.
+
+## 5. Deployment Notes
+-   **Authentication**: `Login.tsx` now redirects `smr` users to `/smr`.
+-   **Routes**: `App.tsx` maps `/smr/*` paths to reuse existing components where possible.

@@ -37,7 +37,9 @@ export const LoginPage = () => {
         .single();
 
       // 3. Smart Redirect
-      if (profile?.role === 'admin_pastor') {
+      if (profile?.role === 'smr') {
+        navigate('/smr'); // <--- NEW REDIRECT
+      } else if (profile?.role === 'admin_pastor') {
         navigate('/admin');
       } else if (profile?.role === 'evangelism_oversight') {
         navigate('/evangelism');

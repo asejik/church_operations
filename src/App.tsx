@@ -26,6 +26,9 @@ import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { EvangelismOverview } from "@/pages/evangelism/EvangelismOverview";
 import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
 
+import { SMRLayout } from "@/components/layout/SMRLayout";
+import { SMRDashboard } from "@/pages/smr/SMRDashboard";
+
 // Simple Landing Page Component
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -95,6 +98,17 @@ function App() {
 
             {/* 2. Reports Page (Table only) */}
             <Route path="reports" element={<EvangelismReports />} />
+          </Route>
+
+          {/* SMR PORTAL ROUTES (Pastor IBK & Dami) */}
+          <Route path="/smr" element={<SMRLayout />}>
+            <Route index element={<SMRDashboard />} />
+            {/* Reuse existing pages but they will show GLOBAL data because of 'is_smr()' policy */}
+            <Route path="finance" element={<FinancePage />} />
+            <Route path="souls" element={<EvangelismOverview />} /> {/* Reuse Overview */}
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="attendance" element={<AttendancePage />} />
+            <Route path="performance" element={<PerformancePage />} />
           </Route>
 
         </Routes>

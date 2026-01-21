@@ -85,9 +85,10 @@ const AddLedgerModal: React.FC<AddLedgerModalProps> = ({ isOpen, onClose, onComp
 // --- MAIN PAGE ---
 export const FinancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
-  const isAdmin = profile?.role === 'admin_pastor';
 
-  // Changed default state to 'requests' so it comes first
+  // FIX: Allow SMR to see the Admin View as well
+  const isAdmin = profile?.role === 'admin_pastor' || profile?.role === 'smr';
+
   const [activeTab, setActiveTab] = useState<'ledger' | 'requests'>('requests');
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -100,10 +101,9 @@ export const FinancePage = () => {
   // Data
   const [ledgerItems, setLedgerItems] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]); // For filter dropdown
+  const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Redundant but safe: ensure admin always sees requests
   useEffect(() => {
     if (isAdmin) setActiveTab('requests');
   }, [isAdmin]);
@@ -200,7 +200,6 @@ export const FinancePage = () => {
 
         {!isAdmin && (
           <div className="flex bg-slate-100 p-1 rounded-lg self-start">
-             {/* Swapped Button Order: Admin Requests First */}
              <button onClick={() => setActiveTab('requests')} className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'requests' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Admin Requests</button>
              <button onClick={() => setActiveTab('ledger')} className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'ledger' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}>Unit Ledger</button>
           </div>
@@ -221,6 +220,7 @@ export const FinancePage = () => {
          </div>
 
          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+            {/* UNIT FILTER (Admin Only) */}
             {isAdmin && (
               <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
@@ -234,6 +234,7 @@ export const FinancePage = () => {
               </select>
             )}
 
+            {/* DATE FILTER */}
             <input
               type="date"
               className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
@@ -241,6 +242,7 @@ export const FinancePage = () => {
               onChange={e => setSelectedDate(e.target.value)}
             />
 
+            {/* CLEAR FILTERS */}
             {(selectedUnit !== 'all' || selectedDate || searchQuery) && (
               <Button
                 variant="ghost"
