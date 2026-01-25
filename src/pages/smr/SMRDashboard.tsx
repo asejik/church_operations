@@ -17,7 +17,7 @@ export const SMRDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalSouls: 0,
-    financeBalance: 0,
+    totalSpent: 0,
     pendingRequests: 0,
     totalMembers: 0,
     recentActivity: [] as any[]
@@ -27,33 +27,36 @@ export const SMRDashboard = () => {
     const fetchExecutiveStats = async () => {
       setLoading(true);
       try {
-        // 1. Finance Stats
-        const { data: financeData } = await supabase.from('finances').select('amount, type');
-        const income = financeData?.filter(f => f.type === 'income').reduce((a, c) => a + c.amount, 0) || 0;
-        const expense = financeData?.filter(f => f.type === 'expense').reduce((a, c) => a + c.amount, 0) || 0;
-
-        // 2. Pending Requests
-        const { count: pendingCount } = await supabase
+        // 1. Finance Stats (FROM REQUESTS, NOT LEDGER)
+        // We assume 'approved' or 'paid' requests count as "Spent"
+        const { data: requestsData } = await supabase
           .from('financial_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
+          .select('amount, status');
 
-        // 3. Souls Stats
+        const approvedSpend = requestsData
+          ?.filter(r => r.status === 'approved' || r.status === 'paid')
+          .reduce((acc, curr) => acc + curr.amount, 0) || 0;
+
+        const pendingCount = requestsData
+          ?.filter(r => r.status === 'pending')
+          .length || 0;
+
+        // 2. Souls Stats
         const { count: soulsCount } = await supabase
           .from('soul_reports')
           .select('*', { count: 'exact', head: true });
 
-        // 4. Members Stats
+        // 3. Members Stats
         const { count: membersCount } = await supabase
           .from('members')
           .select('*', { count: 'exact', head: true });
 
         setStats({
           totalSouls: soulsCount || 0,
-          financeBalance: income - expense,
-          pendingRequests: pendingCount || 0,
+          totalSpent: approvedSpend,
+          pendingRequests: pendingCount,
           totalMembers: membersCount || 0,
-          recentActivity: [] // Can be expanded later
+          recentActivity: []
         });
 
       } catch (err) {
@@ -81,15 +84,15 @@ export const SMRDashboard = () => {
       {/* --- EXECUTIVE METRICS --- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-        {/* Finance Card */}
+        {/* Finance Card (Updated) */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
            <div className="flex items-center gap-4">
              <div className="h-12 w-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
                <Wallet className="h-6 w-6" />
              </div>
              <div>
-               <p className="text-sm font-medium text-slate-500">Net Position</p>
-               <h3 className="text-xl font-bold text-slate-900">{formatCurrency(stats.financeBalance)}</h3>
+               <p className="text-sm font-medium text-slate-500">Total Approved Spend</p>
+               <h3 className="text-xl font-bold text-slate-900">{formatCurrency(stats.totalSpent)}</h3>
              </div>
            </div>
            {stats.pendingRequests > 0 && (
