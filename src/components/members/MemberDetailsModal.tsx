@@ -3,7 +3,7 @@ import { type Member } from '@/lib/db';
 import { Modal } from '@/components/ui/Modal';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Camera, Trash2, Save, User, Shield, BookOpen, Heart, Activity, ArrowRightLeft } from 'lucide-react';
+import { Camera, Trash2, Save, User, Shield, BookOpen, Heart, Activity, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 
@@ -19,13 +19,15 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
   const isReadOnly = profile?.role === 'unit_pastor';
 
   // Refs
-  const transferSectionRef = useRef<HTMLDivElement>(null);
+  const actionSectionRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Transfer State
-  const [showTransferUI, setShowTransferUI] = useState(false);
+  // UI State
+  const [activeAction, setActiveAction] = useState<'transfer' | 'remove' | null>(null);
+
+  // Form State
   const [transferTargetId, setTransferTargetId] = useState<string>('');
   const [requestReason, setRequestReason] = useState('');
 
@@ -39,7 +41,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
   useEffect(() => {
     if (member) {
       setFormData({ ...member });
-      setShowTransferUI(false);
+      setActiveAction(null);
       setRequestReason('');
       setTransferTargetId('');
     }
@@ -64,10 +66,10 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
 
   // 3. Auto-scroll
   useEffect(() => {
-    if (showTransferUI && transferSectionRef.current) {
-      transferSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (activeAction && actionSectionRef.current) {
+      actionSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [showTransferUI]);
+  }, [activeAction]);
 
 
   // --- ACTIONS ---
@@ -103,11 +105,8 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
     if (!member?.id || !formData.full_name) return;
     setLoading(true);
     try {
-      // Direct Cloud Update
       const { error } = await supabase.from('members').update(formData).eq('id', member.id);
-
       if (error) throw error;
-
       toast.success("Member updated");
       onUpdate();
       onClose();
@@ -121,20 +120,20 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
   const handleRequestRemoval = async () => {
     if (isReadOnly || !member?.id) return;
     if (!profile?.unit_id) return;
-    const reason = prompt("Reason for removal:");
-    if (!reason) return;
+    if (!requestReason) { toast.error("Please provide a reason"); return; }
+
     setLoading(true);
     try {
       const { error } = await supabase.from('member_requests').insert({
         unit_id: profile.unit_id,
         member_id: member.id,
-        member_name: member.full_name, // <--- SAVE NAME HERE
+        member_name: member.full_name,
         request_type: 'removal',
-        reason: reason,
+        reason: requestReason,
         status: 'pending'
       });
       if (error) throw error;
-      toast.success("Request sent");
+      toast.success("Removal request sent");
       onClose();
     } catch (err: any) {
       toast.error("Request failed: " + err.message);
@@ -154,7 +153,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
       const { error } = await supabase.from('member_requests').insert({
         unit_id: profile.unit_id,
         member_id: member.id,
-        member_name: member.full_name, // <--- SAVE NAME HERE
+        member_name: member.full_name,
         request_type: 'transfer',
         target_unit_id: transferTargetId,
         reason: requestReason,
@@ -196,9 +195,80 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
           </div>
           <div className="mt-3 text-center">
             <h2 className="text-lg font-bold text-slate-900">{formData.full_name}</h2>
-            <p className="text-xs text-slate-500 uppercase">{formData.role_in_unit?.replace('_', ' ') || 'Member'}</p>
+            <p className="text-xs text-slate-500 uppercase mb-4">{formData.role_in_unit?.replace('_', ' ') || 'Member'}</p>
+
+            {/* ACTION BUTTONS (Header) */}
+            {!isReadOnly && !activeAction && (
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setActiveAction('transfer')}
+                  className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase hover:bg-blue-100 transition-colors border border-blue-100"
+                >
+                   <ArrowRightLeft className="h-3 w-3" /> Request Transfer
+                </button>
+                <button
+                  onClick={() => setActiveAction('remove')}
+                  className="flex items-center gap-1.5 bg-red-50 text-red-500 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase hover:bg-red-100 transition-colors border border-red-100"
+                >
+                   <Trash2 className="h-3 w-3" /> Remove
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* --- CUSTOM ACTION UI (Transfer OR Removal) --- */}
+        {!isReadOnly && activeAction && (
+          <div ref={actionSectionRef} className={`rounded-xl border p-4 animate-in fade-in slide-in-from-top-2 ${activeAction === 'transfer' ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'}`}>
+             <div className={`flex items-center gap-2 mb-3 font-bold text-sm uppercase ${activeAction === 'transfer' ? 'text-blue-800' : 'text-red-800'}`}>
+               {activeAction === 'transfer' ? <ArrowRightLeft className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+               {activeAction === 'transfer' ? 'Request Transfer' : 'Request Removal'}
+             </div>
+
+             <div className="space-y-3">
+               {activeAction === 'transfer' && (
+                 <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase">Transfer To Unit</label>
+                   <select
+                     className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
+                     value={transferTargetId}
+                     onChange={e => setTransferTargetId(e.target.value)}
+                   >
+                     <option value="">-- Select Target Unit --</option>
+                     {availableUnits
+                       .filter(u => u.id !== member.unit_id)
+                       .map(u => (
+                         <option key={u.id} value={u.id}>{u.name}</option>
+                     ))}
+                   </select>
+                 </div>
+               )}
+
+               <div>
+                 <label className="text-xs font-bold text-slate-500 uppercase">Reason</label>
+                 <textarea
+                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
+                    rows={2}
+                    placeholder={activeAction === 'transfer' ? "Why are they transferring?" : "Why should they be removed?"}
+                    value={requestReason}
+                    onChange={e => setRequestReason(e.target.value)}
+                 />
+               </div>
+
+               <div className="flex gap-2 justify-end pt-2">
+                 <Button variant="ghost" size="sm" onClick={() => { setActiveAction(null); setRequestReason(''); }}>Cancel</Button>
+                 <Button
+                    size="sm"
+                    onClick={activeAction === 'transfer' ? handleRequestTransfer : handleRequestRemoval}
+                    isLoading={loading}
+                    className={activeAction === 'remove' ? 'bg-red-600 hover:bg-red-700' : ''}
+                 >
+                   Submit Request
+                 </Button>
+               </div>
+             </div>
+          </div>
+        )}
 
         {/* 1. PERSONAL INFO */}
         <div className="space-y-4">
@@ -208,7 +278,6 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
               <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
               <input disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50" value={formData.full_name || ''} onChange={e => setFormData({ ...formData, full_name: e.target.value })} />
             </div>
-            {/* ADDED EMAIL FIELD */}
             <div className="sm:col-span-2">
               <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
               <input disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} />
@@ -277,68 +346,13 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
            </div>
         </div>
 
-        {/* --- TRANSFER UI (Bottom) --- */}
-        {!isReadOnly && showTransferUI && (
-          <div ref={transferSectionRef} className="rounded-xl border border-blue-100 bg-blue-50 p-4 mt-6 animate-in fade-in slide-in-from-bottom-2">
-             <div className="flex items-center gap-2 mb-3 text-blue-800 font-bold text-sm uppercase">
-               <ArrowRightLeft className="h-4 w-4" /> Request Transfer
-             </div>
-
-             <div className="space-y-3">
-               <div>
-                 <label className="text-xs font-bold text-slate-500 uppercase">Transfer To Unit</label>
-                 <select
-                   className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
-                   value={transferTargetId}
-                   onChange={e => setTransferTargetId(e.target.value)}
-                 >
-                   <option value="">-- Select Target Unit --</option>
-                   {availableUnits
-                     .filter(u => u.id !== member.unit_id)
-                     .map(u => (
-                       <option key={u.id} value={u.id}>{u.name}</option>
-                   ))}
-                 </select>
-               </div>
-
-               <div>
-                 <label className="text-xs font-bold text-slate-500 uppercase">Reason</label>
-                 <textarea
-                    className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    rows={2}
-                    placeholder="Why are they transferring?"
-                    value={requestReason}
-                    onChange={e => setRequestReason(e.target.value)}
-                 />
-               </div>
-
-               <div className="flex gap-2 justify-end pt-2">
-                 <Button variant="ghost" size="sm" onClick={() => setShowTransferUI(false)}>Cancel</Button>
-                 <Button size="sm" onClick={handleRequestTransfer} isLoading={loading}>Submit Request</Button>
-               </div>
-             </div>
-          </div>
-        )}
-
-        {/* --- FOOTER (Visible if NOT Pastor) --- */}
-        {!isReadOnly && !showTransferUI && (
-          <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-slate-100 gap-4 mt-4">
-            <div className="flex gap-4">
-              <button onClick={handleRequestRemoval} className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1">
-                 <Trash2 className="h-4 w-4" /> Request Removal
-              </button>
-
-              <button onClick={() => setShowTransferUI(true)} className="text-blue-500 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                 <ArrowRightLeft className="h-4 w-4" /> Request Transfer
-              </button>
-            </div>
-
-            <div className="flex gap-2 w-full sm:w-auto justify-end">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleSave} isLoading={loading}>
-                <Save className="mr-2 h-4 w-4" /> Save Changes
-              </Button>
-            </div>
+        {/* --- FOOTER (Just Save/Cancel now) --- */}
+        {!isReadOnly && !activeAction && (
+          <div className="flex flex-col sm:flex-row justify-end items-center pt-6 border-t border-slate-100 gap-2 mt-4">
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave} isLoading={loading}>
+              <Save className="mr-2 h-4 w-4" /> Save Changes
+            </Button>
           </div>
         )}
 

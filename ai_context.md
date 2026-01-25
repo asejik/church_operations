@@ -1,5 +1,5 @@
 # Project Status & Architecture Map
-Last Updated: January 21, 2026 (SMR Portal Complete & Reports Engine Live)
+Last Updated: January 25, 2026 (Member UI Refinements & Financial Simplification)
 
 ## 1. Core Architecture: Online-First
 - **Database**: Supabase (PostgreSQL) is the Single Source of Truth.
@@ -32,18 +32,19 @@ We use a **Tiered Permission System** enforced by Database Policies:
 
 ### **A. SMR Portal (Completed Jan 21)**
 - **Layout**: `src/components/layout/SMRLayout.tsx` (Gold/Amber Theme).
-- **Dashboard**: `src/pages/smr/SMRDashboard.tsx` (Executive Summary).
+- **Dashboard**: `src/pages/smr/SMRDashboard.tsx` (Executive Summary: Total Approved Spend, Souls, Workforce).
 - **Reports**: `src/pages/smr/SMRReports.tsx` (Statistical Reports Engine, Printable PDF).
 
 ### **B. Evangelism Portal**
 - **Overview**: `src/pages/evangelism/EvangelismOverview.tsx` (Stats).
-- **Reports**: `src/pages/evangelism/EvangelismReports.tsx` (Data Table).
+- **Reports**: `src/pages/evangelism/EvangelismReports.tsx` (Data Table - Status Column Removed).
 
 ### **C. Shared Modules (Role-Aware)**
 These pages adapt based on `isGlobalViewer` check (`admin_pastor` OR `smr`):
 1.  **Finances**: `src/pages/dashboard/Finance.tsx`
-    -   *SMR/Admin*: Global Requests View.
-    -   *Unit Head*: Unit Ledger View.
+    -   *SMR/Admin*: Global Requests View (Approve/Reject).
+    -   *Unit Head*: Request Submission View.
+    -   *Note*: Unit Ledger (Income/Expense tracking) was removed on Jan 25, 2026.
 2.  **Inventory**: `src/pages/dashboard/Inventory.tsx`
     -   *SMR/Admin*: All Units.
     -   *Unit Head*: Own Unit.
@@ -55,6 +56,8 @@ These pages adapt based on `isGlobalViewer` check (`admin_pastor` OR `smr`):
     -   *Unit Head*: Own Unit (Add Reviews).
 5.  **Souls**: `src/pages/dashboard/Souls.tsx` (Unit View).
     -   *Global View*: Handled by `EvangelismOverview` (Evangelist Chuks) or `SMRDashboard`.
+6.  **Members**: `src/pages/dashboard/Members.tsx`
+    -   *Detail Modal*: `MemberDetailsModal.tsx` updated with custom in-app "Removal/Transfer" flows (native prompts removed).
 
 ## 4. Database Schema Updates
 -   **Profiles**: `role` column now supports `'smr'`.
@@ -64,3 +67,7 @@ These pages adapt based on `isGlobalViewer` check (`admin_pastor` OR `smr`):
 ## 5. Deployment Notes
 -   **Authentication**: `Login.tsx` redirects `smr` users to `/smr`.
 -   **Routes**: `App.tsx` maps `/smr/*` paths.
+
+## 6. Known Issues & Technical Debt
+-   **SMR Reports Logic**: The "Attendance Growth" calculation in `SMRReports.tsx` is currently a mock calculation (using average of current view). Needs to be updated to compare "Current Month vs Previous Month" for true percentage growth.
+-   **Performance UI**: The `Performance.tsx` page needs a "View Details" modal for SMRs to read the full text of a review (currently they can only see the scorecard summary in the table).
