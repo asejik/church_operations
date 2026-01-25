@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/Button';
-import { Plus, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, Pencil, Building2 } from 'lucide-react';
+import { Plus, Loader2, ChevronLeft, ChevronRight, LayoutGrid, List, Pencil, Building2, X } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { NewSessionModal } from '@/components/dashboard/NewSessionModal';
@@ -11,9 +11,7 @@ export const AttendancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
   // --- 1. ROLE LOGIC ---
-  // SMR and Admin Pastors are "Global Viewers"
   const isGlobalViewer = profile?.role === 'smr' || profile?.role === 'admin_pastor';
-  // Only Unit Heads can EDIT data
   const isEditor = profile?.role === 'unit_head';
 
   // --- 2. VIEW STATE ---
@@ -22,7 +20,10 @@ export const AttendancePage = () => {
 
   // --- 3. DATA STATE ---
   const [units, setUnits] = useState<any[]>([]); // For Dropdown
-  const [selectedUnitId, setSelectedUnitId] = useState<string>(""); // The unit we are currently viewing
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+
+  // FILTERS
+  const [filterType, setFilterType] = useState<string>('all');
 
   const [members, setMembers] = useState<any[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
@@ -39,15 +40,12 @@ export const AttendancePage = () => {
       if (!profile) return;
 
       if (isGlobalViewer) {
-        // Fetch ALL units for the dropdown
         const { data } = await supabase.from('units').select('id, name').order('name');
         if (data && data.length > 0) {
           setUnits(data);
-          // Default to the first unit so the screen isn't empty
           if (!selectedUnitId) setSelectedUnitId(data[0].id);
         }
       } else if (profile.unit_id) {
-        // Regular User: Lock to their own unit
         setSelectedUnitId(profile.unit_id);
       }
     };
@@ -56,30 +54,42 @@ export const AttendancePage = () => {
 
   // --- EFFECT: FETCH ATTENDANCE DATA ---
   const fetchData = async () => {
-    // Wait until we have a target unit ID (either from profile or selection)
     if (!selectedUnitId) return;
 
     setDataLoading(true);
     try {
-      // A. Fetch Members for the SELECTED Unit
+      // A. Fetch Members
       const { data: memberData, error: memberError } = await supabase
         .from('members')
         .select('id, full_name')
-        .eq('unit_id', selectedUnitId) // <--- Use Selected ID
+        .eq('unit_id', selectedUnitId)
         .order('full_name');
 
       if (memberError) throw memberError;
 
-      // B. Fetch Logs for the SELECTED Unit
+      // B. Fetch Logs + Event Type JOIN
       const start = startOfMonth(currentDate).toISOString();
       const end = endOfMonth(currentDate).toISOString();
 
-      const { data: logsData, error: logsError } = await supabase
+      // We join with the 'events' table to get the event_type
+      let query = supabase
         .from('attendance')
-        .select('*')
-        .eq('unit_id', selectedUnitId) // <--- Use Selected ID
+        .select(`
+          *,
+          events!inner (
+            title,
+            event_type
+          )
+        `)
+        .eq('unit_id', selectedUnitId)
         .gte('event_date', start)
         .lte('event_date', end);
+
+      if (filterType !== 'all') {
+        query = query.eq('events.event_type', filterType);
+      }
+
+      const { data: logsData, error: logsError } = await query;
 
       if (logsError) throw logsError;
 
@@ -94,10 +104,10 @@ export const AttendancePage = () => {
     }
   };
 
-  // Re-fetch when Unit changes or Date changes
+  // Re-fetch when dependencies change
   useEffect(() => {
     fetchData();
-  }, [selectedUnitId, currentDate]);
+  }, [selectedUnitId, currentDate, filterType]); // Added filterType dependency
 
   // --- HELPER FUNCTIONS ---
   const handleEditSession = (dateStr: string) => {
@@ -144,6 +154,12 @@ export const AttendancePage = () => {
     return { present, absent };
   };
 
+  const getEventTitle = (dateStr: string) => {
+    const log = attendanceLogs.find(l => l.event_date === dateStr);
+    // @ts-ignore - Supabase join returns object, sometimes type defs are tricky without full generation
+    return log?.events?.title || format(parseISO(dateStr), 'EEEE') + ' Service';
+  };
+
   const handleMonthChange = (dir: 'prev' | 'next') => {
     setCurrentDate(curr => dir === 'prev' ? subMonths(curr, 1) : addMonths(curr, 1));
   };
@@ -160,7 +176,7 @@ export const AttendancePage = () => {
              <p className="text-slate-500">Track presence and consistency</p>
            </div>
 
-           {/* GLOBAL UNIT SELECTOR (Only for SMR/Admin) */}
+           {/* GLOBAL UNIT SELECTOR */}
            {isGlobalViewer && (
              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-lg w-fit">
                <Building2 className="h-4 w-4 text-amber-600 ml-2" />
@@ -177,24 +193,17 @@ export const AttendancePage = () => {
            )}
         </div>
 
-        {/* CONTROLS (View Mode + Actions) */}
+        {/* CONTROLS */}
         <div className="flex items-center gap-4">
             <div className="flex bg-slate-100 p-1 rounded-lg">
-              <button
-                onClick={() => setViewMode('matrix')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'matrix' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
-              >
+              <button onClick={() => setViewMode('matrix')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'matrix' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>
                 <LayoutGrid className="h-4 w-4" /> <span className="hidden sm:inline">Matrix</span>
               </button>
-              <button
-                onClick={() => setViewMode('history')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'history' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
-              >
+              <button onClick={() => setViewMode('history')} className={`px-3 py-1.5 text-sm font-medium rounded-md flex items-center gap-2 ${viewMode === 'history' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>
                 <List className="h-4 w-4" /> <span className="hidden sm:inline">History</span>
               </button>
             </div>
 
-            {/* Only Unit Heads can create new sessions */}
             {isEditor && (
               <Button onClick={handleNewSession}>
                 <Plus className="mr-2 h-4 w-4" /> New Session
@@ -203,14 +212,41 @@ export const AttendancePage = () => {
         </div>
       </div>
 
-      {/* MONTH NAV */}
-      <div className="flex justify-center">
+      {/* MONTH NAV & FILTER */}
+      <div className="flex flex-col sm:flex-row justify-center gap-4 items-center">
+        {/* Month Selector */}
         <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
            <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-50 rounded-md text-slate-500"><ChevronLeft className="h-4 w-4" /></button>
            <div className="px-4 font-bold text-slate-700 min-w-[140px] text-center">
              {format(currentDate, 'MMMM yyyy')}
            </div>
            <button onClick={() => handleMonthChange('next')} className="p-2 hover:bg-slate-50 rounded-md text-slate-500"><ChevronRight className="h-4 w-4" /></button>
+        </div>
+
+        {/* Service Type Filter */}
+        <div className="flex items-center gap-2">
+           <select
+             className={`h-10 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 min-w-[160px] cursor-pointer transition-colors ${
+               filterType !== 'all'
+                 ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                 : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+             }`}
+             value={filterType}
+             onChange={e => setFilterType(e.target.value)}
+           >
+             <option value="all">Filter by Type</option>
+             <option value="sunday_service">Sunday Service</option>
+             <option value="midweek_service">Midweek Service</option>
+             <option value="unit_meeting">Unit Meeting</option>
+             <option value="family_meeting">Family Meeting</option>
+             <option value="other">Other</option>
+           </select>
+
+           {filterType !== 'all' && (
+             <Button variant="ghost" size="sm" onClick={() => setFilterType('all')} className="h-10 w-10 p-0 text-red-500 bg-red-50 hover:bg-red-100">
+               <X className="h-4 w-4" />
+             </Button>
+           )}
         </div>
       </div>
 
@@ -235,13 +271,14 @@ export const AttendancePage = () => {
                          <th className="px-4 py-4 w-12 font-bold text-slate-400">S/N</th>
                          <th className="px-4 py-4 font-bold text-slate-700 sticky left-0 bg-slate-50 z-10 shadow-sm">Member Name</th>
                          {matrixDates.length === 0 ? (
-                           <th className="px-4 py-4 font-normal text-slate-400 italic">No sessions this month</th>
+                           <th className="px-4 py-4 font-normal text-slate-400 italic">No sessions found</th>
                          ) : (
                            matrixDates.map(date => {
                              const stats = getDailyStats(date);
                              return (
                                <th key={date} className="px-4 py-3 text-center min-w-[100px]">
-                                 <div className="font-bold text-slate-700">{format(parseISO(date), 'EEE d MMM')}</div>
+                                 <div className="font-bold text-slate-700">{format(parseISO(date), 'EEE d')}</div>
+                                 <div className="text-[10px] text-slate-400 font-normal truncate max-w-[80px] mx-auto">{getEventTitle(date)}</div>
                                  <div className="flex justify-center gap-2 text-[10px] mt-1">
                                    <span className="text-green-600 font-bold">P: {stats.present}</span>
                                    <span className="text-red-500 font-bold">A: {stats.absent}</span>
@@ -296,7 +333,7 @@ export const AttendancePage = () => {
                            <div className="h-10 w-px bg-slate-100"></div>
 
                            <div>
-                             <h3 className="font-bold text-slate-800">{format(parseISO(date), 'EEEE')} Service</h3>
+                             <h3 className="font-bold text-slate-800">{getEventTitle(date)}</h3>
                              <div className="flex gap-4 text-sm mt-1">
                                <span className="text-green-600 font-medium">{stats.present} Present</span>
                                <span className="text-slate-400">•</span>
@@ -325,7 +362,7 @@ export const AttendancePage = () => {
       <NewSessionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        unitId={selectedUnitId} // <--- UPDATED: Uses the selected unit ID (safe for SMR)
+        unitId={selectedUnitId}
         members={members}
         onSuccess={handleSessionSaved}
         defaultDate={editSessionDate}

@@ -67,6 +67,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
               if (type === 'midweek_service') title = "Midweek Service";
               if (type === 'unit_meeting') title = "Unit Meeting";
               if (type === 'family_meeting') title = "Family Meeting";
+              if (type === 'other') title = "Special Event";
 
               setFormData({ ...formData, type, title });
             }}
@@ -75,6 +76,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
             <option value="midweek_service">Midweek Service</option>
             <option value="unit_meeting">Unit Meeting</option>
             <option value="family_meeting">Family Meeting</option>
+            <option value="other">Other</option>
           </select>
         </div>
 
