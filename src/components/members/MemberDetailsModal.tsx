@@ -40,7 +40,11 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
   // 1. Initialize Data
   useEffect(() => {
     if (member) {
-      setFormData({ ...member });
+      setFormData({
+        ...member,
+        // Ensure array is initialized to avoid null errors
+        employment_status: member.employment_status || []
+      });
       setActiveAction(null);
       setRequestReason('');
       setTransferTargetId('');
@@ -53,11 +57,9 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
     const loadDropdowns = async () => {
       if (!profile?.unit_id || !isOpen) return;
 
-      // Fetch Units (for transfer)
       const { data: units } = await supabase.from('units').select('id, name').order('name');
       if (units) setAvailableUnits(units);
 
-      // Fetch Subunits (for dropdown)
       const { data: subs } = await supabase.from('subunits').select('*').eq('unit_id', profile.unit_id);
       if (subs) setSubunits(subs);
     };
@@ -87,7 +89,6 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('member_photos').getPublicUrl(filePath);
 
-      // Update Cloud
       await supabase.from('members').update({ image_url: publicUrl }).eq('id', member.id);
 
       setFormData(prev => ({ ...prev, image_url: publicUrl }));
@@ -197,7 +198,6 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
             <h2 className="text-lg font-bold text-slate-900">{formData.full_name}</h2>
             <p className="text-xs text-slate-500 uppercase mb-4">{formData.role_in_unit?.replace('_', ' ') || 'Member'}</p>
 
-            {/* ACTION BUTTONS (Header) */}
             {!isReadOnly && !activeAction && (
               <div className="flex gap-3 justify-center">
                 <button
@@ -329,8 +329,57 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
         {/* 4. EDU & WORK */}
         <div className="space-y-4">
            <h3 className="text-xs font-bold text-slate-400 uppercase border-b border-slate-100 pb-1 flex items-center gap-2"><BookOpen className="h-3 w-3" /> Edu & Work</h3>
+
+           {/* NEW: Employment Status & NYSC */}
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Employment Status</label>
+                <div className="space-y-2">
+                  {['Student', 'Employed', 'Self-employed', 'Unemployed'].map(opt => (
+                    <label key={opt} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        disabled={isReadOnly}
+                        checked={(formData.employment_status || []).includes(opt)}
+                        onChange={(e) => {
+                          const current = formData.employment_status || [];
+                          // Fix: explicitly type the filter function variable
+                          const newStatus = e.target.checked
+                            ? [...current, opt]
+                            : current.filter((i: string) => i !== opt);
+                          setFormData({ ...formData, employment_status: newStatus });
+                        }}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">NYSC Status</label>
+                <select
+                  disabled={isReadOnly}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100 bg-white"
+                  value={formData.nysc_status || ''}
+                  onChange={e => setFormData({ ...formData, nysc_status: e.target.value })}
+                >
+                  <option value="">-- Select --</option>
+                  {['Completed', 'Ongoing', 'Not Yet'].map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+
+                <div className="mt-3">
+                   <label className="text-xs font-bold text-slate-500 uppercase">Occupation / Job Title</label>
+                   <input disabled={isReadOnly} className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100" value={formData.occupation || ''} onChange={e => setFormData({ ...formData, occupation: e.target.value })} placeholder="e.g. Software Engineer" />
+                </div>
+              </div>
+           </div>
+
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             {['occupation', 'institution', 'course_of_study', 'workplace_address', 'level_of_study'].map(field => (
+             {['institution', 'course_of_study', 'workplace_address', 'level_of_study'].map(field => (
                <div key={field}><label className="text-xs font-bold text-slate-500 uppercase">{field.replace(/_/g, ' ')}</label><input disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50" value={(formData as any)[field] || ''} onChange={e => setFormData({ ...formData, [field]: e.target.value })} /></div>
              ))}
            </div>

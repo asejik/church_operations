@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/Button';
 import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { BatchUploadModal } from '@/components/members/BatchUploadModal';
 import { MemberDetailsModal } from '@/components/members/MemberDetailsModal';
-import { RequestsTab } from '@/components/members/RequestsTab'; // <--- Import New Component
-import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox } from 'lucide-react';
+import { RequestsTab } from '@/components/members/RequestsTab';
+import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { type Member } from '@/lib/db';
@@ -30,7 +30,11 @@ export const MembersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'full_name', direction: 'asc' });
 
-  // 1. FETCH MEMBERS (Only runs when on 'members' tab or first load)
+  // NEW FILTERS
+  const [filterEmployment, setFilterEmployment] = useState<string>('all');
+  const [filterNYSC, setFilterNYSC] = useState<string>('all');
+
+  // 1. FETCH MEMBERS
   const fetchData = async () => {
     if (!profile?.unit_id) return;
     setLoading(true);
@@ -65,6 +69,8 @@ export const MembersPage = () => {
   // 2. FILTERING & SORTING
   const processedMembers = useMemo(() => {
     let result = [...members];
+
+    // Search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       result = result.filter(m =>
@@ -73,6 +79,18 @@ export const MembersPage = () => {
         m.email?.toLowerCase().includes(lowerQuery)
       );
     }
+
+    // Filter: Employment
+    if (filterEmployment !== 'all') {
+      result = result.filter(m => m.employment_status?.includes(filterEmployment));
+    }
+
+    // Filter: NYSC
+    if (filterNYSC !== 'all') {
+      result = result.filter(m => m.nysc_status === filterNYSC);
+    }
+
+    // Sort
     if (sortConfig) {
       result.sort((a: any, b: any) => {
         const valA = a[sortConfig.key] || '';
@@ -83,7 +101,7 @@ export const MembersPage = () => {
       });
     }
     return result;
-  }, [members, searchQuery, sortConfig]);
+  }, [members, searchQuery, sortConfig, filterEmployment, filterNYSC]);
 
   const handleSort = (key: string) => {
     setSortConfig(current => ({
@@ -93,7 +111,6 @@ export const MembersPage = () => {
   };
 
   const getSubunitName = (id?: number) => subunits.find(s => s.id === id)?.name || "—";
-  const formatDate = (dateString?: string) => dateString ? new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : "—";
 
   return (
     <div className="space-y-6 pb-20">
@@ -126,21 +143,77 @@ export const MembersPage = () => {
       {activeTab === 'members' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-300">
            {/* ACTIONS BAR */}
-           <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
-              {/* Search */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search members..."
-                  className="h-9 w-full rounded-lg bg-white border border-slate-200 pl-9 pr-4 text-sm outline-none focus:border-blue-500"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
+           <div className="flex flex-col xl:flex-row gap-4 xl:items-center justify-between">
+
+              {/* FILTERS SECTION */}
+              <div className="flex flex-col sm:flex-row gap-3 flex-1 items-center">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[200px] w-full">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search members..."
+                    className="h-10 w-full rounded-lg bg-white border border-slate-200 pl-9 pr-4 text-sm outline-none focus:border-blue-500"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                {/* VISUAL DIVIDER */}
+                <div className="hidden sm:block h-6 w-px bg-slate-200 mx-1"></div>
+
+                {/* FILTER GROUP */}
+                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                  {/* Employment Filter */}
+                  <select
+                    className={`h-10 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 min-w-[160px] cursor-pointer transition-colors ${
+                      filterEmployment !== 'all'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                    }`}
+                    value={filterEmployment}
+                    onChange={e => setFilterEmployment(e.target.value)}
+                  >
+                    <option value="all">Filter by Employment</option>
+                    <option value="Student">Student</option>
+                    <option value="Employed">Employed</option>
+                    <option value="Self-employed">Self-employed</option>
+                    <option value="Unemployed">Unemployed</option>
+                  </select>
+
+                  {/* NYSC Filter */}
+                  <select
+                    className={`h-10 rounded-lg border px-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 min-w-[140px] cursor-pointer transition-colors ${
+                      filterNYSC !== 'all'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300'
+                    }`}
+                    value={filterNYSC}
+                    onChange={e => setFilterNYSC(e.target.value)}
+                  >
+                    <option value="all">Filter by NYSC</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Ongoing">Ongoing</option>
+                    <option value="Not Yet">Not Yet</option>
+                  </select>
+
+                  {/* Clear Filters Button (Only visible if active) */}
+                  {(filterEmployment !== 'all' || filterNYSC !== 'all' || searchQuery) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setFilterEmployment('all'); setFilterNYSC('all'); setSearchQuery(''); }}
+                      className="h-10 px-2 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                      title="Clear Filters"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {/* Buttons */}
-              <div className="flex gap-2 self-end sm:self-auto">
+              {/* BUTTONS */}
+              <div className="flex gap-2 self-end xl:self-auto">
                  <button onClick={fetchData} className="flex items-center gap-1 text-sm text-blue-600 hover:underline mr-2">
                    <RefreshCw className="h-3 w-3" /> Refresh
                  </button>
@@ -159,51 +232,67 @@ export const MembersPage = () => {
 
            {/* TABLE */}
            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-             {/* ... Same Table Code as Before ... */}
-             <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                  <th className="px-4 py-4 w-12">S/N</th>
-                  <th className="px-4 py-4 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('full_name')}>
-                    <div className="flex items-center gap-1">Name <ArrowUpDown className="h-3 w-3" /></div>
-                  </th>
-                  <th className="px-4 py-4">Email</th>
-                  <th className="px-4 py-4">Phone</th>
-                  <th className="px-4 py-4">Gender</th>
-                  <th className="px-4 py-4">Status</th>
-                  <th className="px-4 py-4">Subunit</th>
-                  <th className="px-4 py-4">Birthday</th>
-                  <th className="px-4 py-4 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {processedMembers.length === 0 ? (
-                  <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-500">No members found.</td></tr>
-                ) : (
-                  processedMembers.map((member, index) => (
-                    <tr key={member.id} onClick={() => setSelectedMember(member)} className="group hover:bg-blue-50/50 cursor-pointer transition-colors">
-                      <td className="px-4 py-3 text-slate-400 font-mono text-xs">{(index + 1).toString().padStart(2, '0')}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-900 group-hover:text-blue-700">
-                        <div className="flex items-center gap-2">
-                          {member.full_name}
-                          {member.role_in_unit === 'unit_head' && <div title="Unit Head" className="flex items-center justify-center h-5 w-5 rounded-full bg-amber-100"><Crown className="h-3 w-3 text-amber-600 fill-amber-600" /></div>}
-                          {member.role_in_unit === 'subunit_head' && <div title="Subunit Head" className="flex items-center justify-center h-5 w-5 rounded-full bg-blue-100"><Shield className="h-3 w-3 text-blue-600 fill-blue-600" /></div>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 text-xs">{member.email || "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{member.phone_number || "—"}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium border ${member.gender?.toLowerCase() === 'male' ? 'bg-blue-50 text-blue-700 border-blue-100' : member.gender?.toLowerCase() === 'female' ? 'bg-pink-50 text-pink-700 border-pink-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{member.gender || '—'}</span></td>
-                      <td className="px-4 py-3 text-slate-600 capitalize">{member.marital_status || "—"}</td>
-                      <td className="px-4 py-3 text-slate-600 font-medium">{getSubunitName(member.subunit_id)}</td>
-                      <td className="px-4 py-3 text-slate-600">{formatDate(member.dob)}</td>
-                      <td className="px-4 py-3 text-right"><ChevronRight className="ml-auto h-4 w-4 text-slate-300 group-hover:text-blue-400" /></td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-           </div>
+             {loading ? (
+                <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+             ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                        <th className="px-4 py-4 w-12">S/N</th>
+                        <th className="px-4 py-4 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('full_name')}>
+                          <div className="flex items-center gap-1">Name <ArrowUpDown className="h-3 w-3" /></div>
+                        </th>
+                        <th className="px-4 py-4">Phone</th>
+                        <th className="px-4 py-4">Employment</th>
+                        <th className="px-4 py-4">NYSC</th>
+                        <th className="px-4 py-4">Subunit</th>
+                        <th className="px-4 py-4 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {processedMembers.length === 0 ? (
+                        <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">No members found matching your filters.</td></tr>
+                      ) : (
+                        processedMembers.map((member, index) => (
+                          <tr key={member.id} onClick={() => setSelectedMember(member)} className="group hover:bg-blue-50/50 cursor-pointer transition-colors">
+                            <td className="px-4 py-3 text-slate-400 font-mono text-xs">{(index + 1).toString().padStart(2, '0')}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-900 group-hover:text-blue-700">
+                              <div className="flex items-center gap-2">
+                                {member.full_name}
+                                {member.role_in_unit === 'unit_head' && <div title="Unit Head" className="flex items-center justify-center h-5 w-5 rounded-full bg-amber-100"><Crown className="h-3 w-3 text-amber-600 fill-amber-600" /></div>}
+                                {member.role_in_unit === 'subunit_head' && <div title="Subunit Head" className="flex items-center justify-center h-5 w-5 rounded-full bg-blue-100"><Shield className="h-3 w-3 text-blue-600 fill-blue-600" /></div>}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">{member.phone_number || "—"}</td>
+
+                            {/* EMPLOYMENT STATUS COLUMN */}
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1">
+                                {member.employment_status && member.employment_status.length > 0 ? (
+                                  member.employment_status.map((st: string) => (
+                                    <span key={st} className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                      {st}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-400 text-xs">—</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* NYSC STATUS COLUMN */}
+                            <td className="px-4 py-3 text-slate-600 text-xs">{member.nysc_status || "—"}</td>
+
+                            <td className="px-4 py-3 text-slate-600 font-medium">{getSubunitName(member.subunit_id)}</td>
+                            <td className="px-4 py-3 text-right"><ChevronRight className="ml-auto h-4 w-4 text-slate-300 group-hover:text-blue-400" /></td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+             )}
            </div>
         </div>
       )}

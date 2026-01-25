@@ -30,7 +30,7 @@ export interface Member {
   attended_membership_class?: boolean;
   completed_ces?: boolean;
   ces_completion_date?: string;
-  occupation?: string;
+  occupation?: string | null;
   workplace_address?: string;
   workplace_location?: string;
   institution?: string;
@@ -51,6 +51,8 @@ export interface Member {
   medical_details?: string;
   synced?: boolean;
   updated_at?: string;
+  employment_status?: string[] | null;
+  nysc_status?: string | null;
 }
 
 // 2. Unit Metadata (NEW)

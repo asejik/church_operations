@@ -1,5 +1,5 @@
 # Project Status & Architecture Map
-Last Updated: January 25, 2026 (Member UI Refinements & Financial Simplification)
+Last Updated: January 25, 2026 (Members Schema Update & Filter UI Standardization)
 
 ## 1. Core Architecture: Online-First
 - **Database**: Supabase (PostgreSQL) is the Single Source of Truth.
@@ -57,10 +57,13 @@ These pages adapt based on `isGlobalViewer` check (`admin_pastor` OR `smr`):
 5.  **Souls**: `src/pages/dashboard/Souls.tsx` (Unit View).
     -   *Global View*: Handled by `EvangelismOverview` (Evangelist Chuks) or `SMRDashboard`.
 6.  **Members**: `src/pages/dashboard/Members.tsx`
-    -   *Detail Modal*: `MemberDetailsModal.tsx` updated with custom in-app "Removal/Transfer" flows (native prompts removed).
+    -   *Features*: "Filter by" UI pattern, Registration, Batch Upload.
+    -   *Schema*: Includes `employment_status` (checkbox array) and `nysc_status`.
+    -   *Detail Modal*: `MemberDetailsModal.tsx` includes custom in-app "Removal/Transfer" flows.
 
 ## 4. Database Schema Updates
 -   **Profiles**: `role` column now supports `'smr'`.
+-   **Members**: Added `employment_status` (text[]) and `nysc_status` (text) columns.
 -   **Functions**: Added `is_smr()` for super-admin security policies.
 -   **Policies**: Updated all core tables to allow `is_smr()` full access.
 
