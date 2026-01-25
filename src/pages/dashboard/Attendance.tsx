@@ -33,6 +33,8 @@ export const AttendancePage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editSessionDate, setEditSessionDate] = useState<string | undefined>(undefined);
   const [editSessionStatuses, setEditSessionStatuses] = useState<Record<string, 'present' | 'absent'> | undefined>(undefined);
+  // NEW: State to hold reasons for editing
+  const [editSessionReasons, setEditSessionReasons] = useState<Record<string, string> | undefined>(undefined);
 
   // --- EFFECT: INITIALIZE UNIT SELECTION ---
   useEffect(() => {
@@ -71,7 +73,6 @@ export const AttendancePage = () => {
       const start = startOfMonth(currentDate).toISOString();
       const end = endOfMonth(currentDate).toISOString();
 
-      // We join with the 'events' table to get the event_type
       let query = supabase
         .from('attendance')
         .select(`
@@ -104,27 +105,33 @@ export const AttendancePage = () => {
     }
   };
 
-  // Re-fetch when dependencies change
   useEffect(() => {
     fetchData();
-  }, [selectedUnitId, currentDate, filterType]); // Added filterType dependency
+  }, [selectedUnitId, currentDate, filterType]);
 
   // --- HELPER FUNCTIONS ---
   const handleEditSession = (dateStr: string) => {
     if (!isEditor) return;
     const logs = attendanceLogs.filter(l => l.event_date === dateStr);
+
     const statuses: Record<string, 'present' | 'absent'> = {};
+    const reasons: Record<string, string> = {}; // <--- Extract reasons
+
     logs.forEach(l => {
       statuses[l.member_id] = l.status;
+      if (l.reason) reasons[l.member_id] = l.reason;
     });
+
     setEditSessionDate(dateStr);
     setEditSessionStatuses(statuses);
+    setEditSessionReasons(reasons); // <--- Save to state
     setIsModalOpen(true);
   };
 
   const handleNewSession = () => {
     setEditSessionDate(undefined);
     setEditSessionStatuses(undefined);
+    setEditSessionReasons(undefined);
     setIsModalOpen(true);
   };
 
@@ -147,6 +154,12 @@ export const AttendancePage = () => {
     return log?.status || '-';
   };
 
+  // Helper to get reason for matrix tooltip
+  const getReason = (memberId: string, dateStr: string) => {
+    const log = attendanceLogs.find(l => l.member_id === memberId && l.event_date === dateStr);
+    return log?.reason || '';
+  };
+
   const getDailyStats = (dateStr: string) => {
     const logs = attendanceLogs.filter(l => l.event_date === dateStr);
     const present = logs.filter(l => l.status === 'present').length;
@@ -154,9 +167,16 @@ export const AttendancePage = () => {
     return { present, absent };
   };
 
+  const getMemberMonthlyStats = (memberId: string) => {
+    const memberLogs = attendanceLogs.filter(l => l.member_id === memberId);
+    const present = memberLogs.filter(l => l.status === 'present').length;
+    const absent = memberLogs.filter(l => l.status === 'absent').length;
+    return { present, absent };
+  };
+
   const getEventTitle = (dateStr: string) => {
     const log = attendanceLogs.find(l => l.event_date === dateStr);
-    // @ts-ignore - Supabase join returns object, sometimes type defs are tricky without full generation
+    // @ts-ignore
     return log?.events?.title || format(parseISO(dateStr), 'EEEE') + ' Service';
   };
 
@@ -269,14 +289,14 @@ export const AttendancePage = () => {
                      <thead>
                        <tr className="bg-slate-50 border-b border-slate-200">
                          <th className="px-4 py-4 w-12 font-bold text-slate-400">S/N</th>
-                         <th className="px-4 py-4 font-bold text-slate-700 sticky left-0 bg-slate-50 z-10 shadow-sm">Member Name</th>
+                         <th className="px-4 py-4 font-bold text-slate-700 sticky left-0 bg-slate-50 z-10 shadow-sm border-r border-slate-100">Member Name</th>
                          {matrixDates.length === 0 ? (
                            <th className="px-4 py-4 font-normal text-slate-400 italic">No sessions found</th>
                          ) : (
                            matrixDates.map(date => {
                              const stats = getDailyStats(date);
                              return (
-                               <th key={date} className="px-4 py-3 text-center min-w-[100px]">
+                               <th key={date} className="px-4 py-3 text-center min-w-[100px] border-r border-slate-50">
                                  <div className="font-bold text-slate-700">{format(parseISO(date), 'EEE d')}</div>
                                  <div className="text-[10px] text-slate-400 font-normal truncate max-w-[80px] mx-auto">{getEventTitle(date)}</div>
                                  <div className="flex justify-center gap-2 text-[10px] mt-1">
@@ -287,25 +307,54 @@ export const AttendancePage = () => {
                              );
                            })
                          )}
+                         <th className="px-4 py-4 text-center font-bold text-slate-900 bg-slate-50 border-l border-slate-200 sticky right-0 z-10 shadow-sm">
+                           Total
+                         </th>
                        </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
-                       {members.map((member, idx) => (
-                         <tr key={member.id} className="hover:bg-slate-50">
-                           <td className="px-4 py-3 text-slate-400 text-xs font-mono">{(idx + 1).toString().padStart(2, '0')}</td>
-                           <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10">{member.full_name}</td>
-                           {matrixDates.map(date => {
-                             const status = getStatus(member.id, date);
-                             return (
-                               <td key={date} className="px-4 py-3 text-center">
-                                 {status === 'present' && <span className="inline-flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded font-bold text-xs">P</span>}
-                                 {status === 'absent' && <span className="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded font-bold text-xs">A</span>}
-                                 {status === '-' && <span className="text-slate-300">-</span>}
-                               </td>
-                             );
-                           })}
-                         </tr>
-                       ))}
+                       {members.map((member, idx) => {
+                         const memberStats = getMemberMonthlyStats(member.id);
+                         return (
+                           <tr key={member.id} className="hover:bg-slate-50">
+                             <td className="px-4 py-3 text-slate-400 text-xs font-mono">{(idx + 1).toString().padStart(2, '0')}</td>
+                             <td className="px-4 py-3 font-medium text-slate-900 sticky left-0 bg-white z-10 border-r border-slate-100">{member.full_name}</td>
+                             {matrixDates.map(date => {
+                               const status = getStatus(member.id, date);
+                               return (
+                                 <td key={date} className="px-4 py-3 text-center border-r border-slate-50">
+                                   {status === 'present' && <span className="inline-flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded font-bold text-xs">P</span>}
+
+                                   {/* CLICKABLE 'A' BADGE FOR REASON */}
+                                   {status === 'absent' && (
+                                     <button
+                                       onClick={() => {
+                                          const reason = getReason(member.id, date);
+                                          toast.info(`${member.full_name}: Absent`, {
+                                            description: reason ? `Reason: ${reason}` : "No reason provided."
+                                          });
+                                       }}
+                                       className="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded font-bold text-xs hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                                       title={getReason(member.id, date) || "Absent"}
+                                     >
+                                       A
+                                     </button>
+                                   )}
+
+                                   {status === '-' && <span className="text-slate-300">-</span>}
+                                 </td>
+                               );
+                             })}
+
+                             <td className="px-4 py-3 text-center sticky right-0 bg-white z-10 border-l border-slate-200">
+                                <div className="flex flex-col gap-1 items-center justify-center text-[10px] font-bold">
+                                   <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full w-14 border border-green-100">P: {memberStats.present}</span>
+                                   <span className="text-red-500 bg-red-50 px-2 py-0.5 rounded-full w-14 border border-red-100">A: {memberStats.absent}</span>
+                                </div>
+                             </td>
+                           </tr>
+                         );
+                       })}
                      </tbody>
                    </table>
                  </div>
@@ -367,6 +416,8 @@ export const AttendancePage = () => {
         onSuccess={handleSessionSaved}
         defaultDate={editSessionDate}
         initialStatuses={editSessionStatuses}
+        initialReasons={editSessionReasons} // <--- Pass reasons here
+        existingEventId={editSessionDate ? attendanceLogs.find(l => l.event_date === editSessionDate)?.event_id : undefined}
       />
     </div>
   );
