@@ -52,9 +52,6 @@ export const InventoryPage = () => {
     fetchInventory();
   }, [profile?.unit_id, isAdmin]);
 
-  // ... (Remainder of the file logic for getConditionBadge, getConditionIcon, and filteredItems remains exactly the same)
-  // To keep the response concise, I'm pasting the FULL logic below for safety.
-
   const getConditionBadge = (c: string) => {
     if (c === 'new' || c === 'good') return 'bg-green-100 text-green-700 border-green-200';
     if (c === 'fair') return 'bg-blue-50 text-blue-700 border-blue-100';
@@ -66,6 +63,11 @@ export const InventoryPage = () => {
     if (c === 'new' || c === 'good') return <CheckCircle className="mr-1.5 h-3 w-3" />;
     if (c === 'fair') return <HelpCircle className="mr-1.5 h-3 w-3" />;
     return <AlertTriangle className="mr-1.5 h-3 w-3" />;
+  };
+
+  const formatDate = (date: string) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const filteredItems = items
@@ -162,6 +164,7 @@ export const InventoryPage = () => {
                   <th className="px-4 py-4 w-12 border-r border-slate-100">S/N</th>
                   {isAdmin && <th className="px-4 py-4 border-r border-slate-100">Unit</th>}
                   <th className="px-4 py-4 border-r border-slate-100">Item Name</th>
+                  <th className="px-4 py-4 border-r border-slate-100">Date Purchased</th> {/* NEW COLUMN */}
                   <th className="px-4 py-4 border-r border-slate-100">Condition</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center">Qty</th>
                   <th className="px-4 py-4">Notes</th>
@@ -170,7 +173,7 @@ export const InventoryPage = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.length === 0 ? (
                    <tr>
-                     <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center text-slate-500">
+                     <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-500">
                        <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
                        No items found matching filters.
                      </td>
@@ -188,6 +191,10 @@ export const InventoryPage = () => {
                       )}
                       <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
                         {item.item_name}
+                      </td>
+                      {/* DATE PURCHASED CELL */}
+                      <td className="px-4 py-3 text-slate-600 border-r border-slate-100 whitespace-nowrap">
+                        {formatDate(item.date_purchased)}
                       </td>
                       <td className="px-4 py-3 border-r border-slate-100">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border capitalize ${getConditionBadge(item.condition)}`}>

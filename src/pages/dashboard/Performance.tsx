@@ -1,154 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Star, User, MessageSquare, BarChart2, Loader2, Building2 } from 'lucide-react';
+import { Plus, Search, Star, User, MessageSquare, Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
+import { ReviewModal } from '@/components/performance/ReviewModal';
 
-// --- INTERNAL COMPONENT: STAR RATING ---
-const StarInput = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => (
-  <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-    <span className="text-sm font-medium text-slate-700">{label}</span>
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          className={`p-1 transition-transform hover:scale-110 focus:outline-none`}
-        >
-          <Star
-            className={`h-5 w-5 ${star <= value ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`}
-          />
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-// --- MODAL: ADD REVIEW (ONLINE ONLY) ---
-const AddReviewModal = ({ isOpen, onClose, onComplete, members, unitId }: { isOpen: boolean; onClose: () => void; onComplete: () => void, members: any[], unitId: string }) => {
-  const [loading, setLoading] = useState(false);
-
-  const [formData, setFormData] = useState({
-    member_id: '',
-    rating_punctuality: 3,
-    rating_availability: 3,
-    rating_skill: 3,
-    rating_teamwork: 3,
-    rating_spiritual: 3,
-    comment: '',
-    review_date: new Date().toISOString().split('T')[0]
-  });
-
-  const handleSubmit = async () => {
-    if (!unitId || !formData.member_id) {
-      toast.error("Please select a member");
-      return;
-    }
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('performance_reviews').insert({
-        unit_id: unitId,
-        member_id: formData.member_id,
-        rating_punctuality: formData.rating_punctuality,
-        rating_availability: formData.rating_availability,
-        rating_skill: formData.rating_skill,
-        rating_teamwork: formData.rating_teamwork,
-        rating_spiritual: formData.rating_spiritual,
-        comment: formData.comment,
-        review_date: formData.review_date,
-      });
-
-      if (error) throw error;
-
-      toast.success("Review saved successfully");
-      onComplete();
-      onClose();
-      setFormData(prev => ({
-        ...prev,
-        member_id: '',
-        comment: '',
-        rating_punctuality: 3, rating_availability: 3, rating_skill: 3, rating_teamwork: 3, rating_spiritual: 3
-      }));
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to save review");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="New Performance Review">
-      <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 sm:col-span-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Select Member</label>
-            <select
-              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white"
-              value={formData.member_id}
-              onChange={e => setFormData({ ...formData, member_id: e.target.value })}
-            >
-              <option value="">-- Choose Member --</option>
-              {members.map(m => (
-                <option key={m.id} value={m.id}>{m.full_name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <label className="text-xs font-bold text-slate-500 uppercase">Date</label>
-            <input
-              type="date"
-              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              value={formData.review_date}
-              onChange={e => setFormData({ ...formData, review_date: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-200">
-             <BarChart2 className="h-4 w-4 text-blue-600" />
-             <h3 className="text-sm font-bold text-slate-800">Scorecard</h3>
-          </div>
-          <div className="space-y-1">
-            <StarInput label="Punctuality" value={formData.rating_punctuality} onChange={v => setFormData({...formData, rating_punctuality: v})} />
-            <StarInput label="Availability" value={formData.rating_availability} onChange={v => setFormData({...formData, rating_availability: v})} />
-            <StarInput label="Skill Proficiency" value={formData.rating_skill} onChange={v => setFormData({...formData, rating_skill: v})} />
-            <StarInput label="Teamwork" value={formData.rating_teamwork} onChange={v => setFormData({...formData, rating_teamwork: v})} />
-            <StarInput label="Spiritual Growth" value={formData.rating_spiritual} onChange={v => setFormData({...formData, rating_spiritual: v})} />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase">General Comment</label>
-          <textarea
-            className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-            rows={2}
-            placeholder="Key observations..."
-            value={formData.comment}
-            onChange={e => setFormData({ ...formData, comment: e.target.value })}
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} isLoading={loading}>Save Review</Button>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
-// --- MAIN PAGE ---
 export const PerformancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
   // --- 1. ROLE LOGIC ---
   const isGlobalViewer = profile?.role === 'smr' || profile?.role === 'admin_pastor';
-  // Only Unit Heads can ADD reviews
   const isEditor = profile?.role === 'unit_head';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -156,7 +18,7 @@ export const PerformancePage = () => {
   const [activeTab, setActiveTab] = useState<string>('');
 
   // --- 2. DATA STATE ---
-  const [units, setUnits] = useState<any[]>([]); // For Dropdown
+  const [units, setUnits] = useState<any[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>("");
 
   const [reviews, setReviews] = useState<any[]>([]);
@@ -168,14 +30,12 @@ export const PerformancePage = () => {
     const initUnits = async () => {
       if (!profile) return;
       if (isGlobalViewer) {
-        // Fetch ALL units
         const { data } = await supabase.from('units').select('id, name').order('name');
         if (data && data.length > 0) {
           setUnits(data);
           if (!selectedUnitId) setSelectedUnitId(data[0].id);
         }
       } else if (profile.unit_id) {
-        // Lock to own unit
         setSelectedUnitId(profile.unit_id);
       }
     };
@@ -187,7 +47,6 @@ export const PerformancePage = () => {
     if (!selectedUnitId) return;
     setLoading(true);
     try {
-      // 1. Fetch Members
       const { data: memberData } = await supabase
         .from('members')
         .select('id, full_name, image_url')
@@ -195,7 +54,6 @@ export const PerformancePage = () => {
 
       setMembers(memberData || []);
 
-      // 2. Fetch Reviews
       const { data: reviewData } = await supabase
         .from('performance_reviews')
         .select('*')
@@ -234,8 +92,16 @@ export const PerformancePage = () => {
       monthsSet.add(monthKey);
       if (!grouped[monthKey]) grouped[monthKey] = [];
 
-      // Calculate Average
-      const avg = (r.rating_punctuality + r.rating_availability + r.rating_skill + r.rating_teamwork + r.rating_spiritual) / 5;
+      // Calculate Average (Updated for 6 Categories)
+      const scoreSum =
+        (r.rating_punctuality || 0) +
+        (r.rating_communication || 0) +
+        (r.rating_commitment || 0) +
+        (r.rating_teamwork || 0) +
+        (r.rating_responsibility || 0) +
+        (r.rating_spiritual || 0);
+
+      const avg = scoreSum / 6;
 
       grouped[monthKey].push({
         ...r,
@@ -249,7 +115,6 @@ export const PerformancePage = () => {
     return { months: sortedMonths, grouped };
   }, [reviews, members, searchQuery]);
 
-  // Set default tab
   useEffect(() => {
     if (!activeTab && processedData.months.length > 0) {
       setActiveTab(processedData.months[0]);
@@ -259,9 +124,9 @@ export const PerformancePage = () => {
   const currentReviews = activeTab ? (processedData.grouped[activeTab] || []) : [];
 
   const ScoreBadge = ({ label, score }: { label: string, score: number }) => (
-    <div className="flex flex-col items-center">
-      <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>{score}</span>
-      <span className="text-[8px] text-slate-400 uppercase">{label}</span>
+    <div className="flex flex-col items-center min-w-[30px]">
+      <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>{score || '-'}</span>
+      <span className="text-[7px] text-slate-400 uppercase tracking-tighter">{label}</span>
     </div>
   );
 
@@ -278,7 +143,6 @@ export const PerformancePage = () => {
               <p className="text-slate-500">Holistic member evaluation</p>
             </div>
 
-            {/* UNIT SELECTOR (Global Viewers Only) */}
             {isGlobalViewer && (
              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-lg w-fit">
                <Building2 className="h-4 w-4 text-amber-600 ml-2" />
@@ -295,7 +159,6 @@ export const PerformancePage = () => {
            )}
         </div>
 
-        {/* ADD BUTTON (Unit Heads Only) */}
         {isEditor && (
           <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Review</Button>
         )}
@@ -325,7 +188,7 @@ export const PerformancePage = () => {
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
                   <th className="px-4 py-4 w-12 border-r border-slate-100 text-center">S/N</th>
                   <th className="px-4 py-4 border-r border-slate-100">Member Name</th>
-                  <th className="px-4 py-4 border-r border-slate-100 text-center">Breakdown</th>
+                  <th className="px-4 py-4 border-r border-slate-100 text-center">Score Breakdown</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center w-24">Avg</th>
                   <th className="px-4 py-4 w-32 text-right">Date</th>
                 </tr>
@@ -350,17 +213,18 @@ export const PerformancePage = () => {
                           <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400"><User className="h-3 w-3" /></div>
                           <div className="flex flex-col">
                               <span>{review.member_name}</span>
-                              <span className="text-[10px] text-slate-400 font-normal italic">"{review.comment}"</span>
+                              {review.comment && <span className="text-[10px] text-slate-400 font-normal italic truncate max-w-[150px]">"{review.comment}"</span>}
                           </div>
                         </div>
                       </td>
 
                       <td className="px-4 py-3 border-r border-slate-100">
-                        <div className="flex justify-center gap-3">
+                        <div className="flex justify-center gap-2">
                            <ScoreBadge label="Punc" score={review.rating_punctuality} />
-                           <ScoreBadge label="Avail" score={review.rating_availability} />
-                           <ScoreBadge label="Skill" score={review.rating_skill} />
+                           <ScoreBadge label="Comm" score={review.rating_communication} />
+                           <ScoreBadge label="Svc" score={review.rating_commitment} />
                            <ScoreBadge label="Team" score={review.rating_teamwork} />
+                           <ScoreBadge label="Resp" score={review.rating_responsibility} />
                            <ScoreBadge label="Spirit" score={review.rating_spiritual} />
                         </div>
                       </td>
@@ -384,12 +248,12 @@ export const PerformancePage = () => {
         </div>
       </div>
 
-      <AddReviewModal
+      <ReviewModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        onComplete={fetchData}
-        members={members}
-        unitId={selectedUnitId} // Pass selected unit to modal
+        onReviewSubmitted={fetchData}
+        members={members}       // <--- Passed Members
+        unitId={selectedUnitId} // <--- Passed Unit ID
       />
     </div>
   );
