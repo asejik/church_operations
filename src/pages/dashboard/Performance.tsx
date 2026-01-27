@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Plus, Search, Star, User, MessageSquare, Loader2, Building2 } from 'lucide-react';
+import { Plus, Search, Star, User, MessageSquare, Loader2, Building2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { ReviewModal } from '@/components/performance/ReviewModal';
@@ -13,7 +13,8 @@ export const PerformancePage = () => {
   const isGlobalViewer = profile?.role === 'smr' || profile?.role === 'admin_pastor';
   const isEditor = profile?.role === 'unit_head';
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingReview, setEditingReview] = useState<any>(null); // <--- State for review being edited
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('');
 
@@ -74,6 +75,17 @@ export const PerformancePage = () => {
     fetchData();
   }, [selectedUnitId]);
 
+  // --- HANDLERS ---
+  const handleAddNew = () => {
+    setEditingReview(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (review: any) => {
+    setEditingReview(review);
+    setIsModalOpen(true);
+  };
+
   // --- 5. PROCESS DATA (Grouping by Month) ---
   const processedData = useMemo(() => {
     if (reviews.length === 0 || members.length === 0) return { months: [], grouped: {} };
@@ -123,12 +135,28 @@ export const PerformancePage = () => {
 
   const currentReviews = activeTab ? (processedData.grouped[activeTab] || []) : [];
 
-  const ScoreBadge = ({ label, score }: { label: string, score: number }) => (
-    <div className="flex flex-col items-center min-w-[30px]">
-      <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>{score || '-'}</span>
-      <span className="text-[7px] text-slate-400 uppercase tracking-tighter">{label}</span>
-    </div>
-  );
+  // --- SCORE BADGE COMPONENT (With Click Interaction) ---
+  const ScoreBadge = ({ label, score, comment }: { label: string, score: number, comment?: string }) => {
+    const hasComment = !!comment;
+
+    return (
+      <div
+        onClick={() => hasComment && toast.info(`${label} Note`, { description: comment })}
+        className={`flex flex-col items-center min-w-[30px] rounded p-1 transition-all ${
+          hasComment ? 'cursor-pointer hover:bg-slate-100 ring-1 ring-transparent hover:ring-slate-200' : ''
+        }`}
+        title={hasComment ? "Click to view note" : ""}
+      >
+        <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>
+          {score || '-'}
+        </span>
+        <div className="flex items-center gap-0.5">
+          <span className="text-[7px] text-slate-400 uppercase tracking-tighter">{label}</span>
+          {hasComment && <div className="h-1 w-1 rounded-full bg-blue-400" />}
+        </div>
+      </div>
+    );
+  };
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
 
@@ -160,7 +188,7 @@ export const PerformancePage = () => {
         </div>
 
         {isEditor && (
-          <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Review</Button>
+          <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" /> New Review</Button>
         )}
       </div>
 
@@ -191,12 +219,13 @@ export const PerformancePage = () => {
                   <th className="px-4 py-4 border-r border-slate-100 text-center">Score Breakdown</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center w-24">Avg</th>
                   <th className="px-4 py-4 w-32 text-right">Date</th>
+                  {isEditor && <th className="px-4 py-4 w-12"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {currentReviews.length === 0 ? (
                    <tr>
-                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                     <td colSpan={isEditor ? 6 : 5} className="px-6 py-12 text-center text-slate-500">
                        <div className="flex flex-col items-center">
                          <MessageSquare className="h-10 w-10 text-slate-300 mb-2" />
                          <p>No reviews found for {activeTab || "this unit"}.</p>
@@ -206,7 +235,7 @@ export const PerformancePage = () => {
                    </tr>
                 ) : (
                   currentReviews.map((review, i) => (
-                    <tr key={review.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={review.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-4 py-3 text-center text-slate-400 text-xs border-r border-slate-100">{(i + 1).toString().padStart(2, '0')}</td>
                       <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
                         <div className="flex items-center gap-2">
@@ -220,12 +249,12 @@ export const PerformancePage = () => {
 
                       <td className="px-4 py-3 border-r border-slate-100">
                         <div className="flex justify-center gap-2">
-                           <ScoreBadge label="Punc" score={review.rating_punctuality} />
-                           <ScoreBadge label="Comm" score={review.rating_communication} />
-                           <ScoreBadge label="Svc" score={review.rating_commitment} />
-                           <ScoreBadge label="Team" score={review.rating_teamwork} />
-                           <ScoreBadge label="Resp" score={review.rating_responsibility} />
-                           <ScoreBadge label="Spirit" score={review.rating_spiritual} />
+                           <ScoreBadge label="Punc" score={review.rating_punctuality} comment={review.comment_punctuality} />
+                           <ScoreBadge label="Comm" score={review.rating_communication} comment={review.comment_communication} />
+                           <ScoreBadge label="Svc" score={review.rating_commitment} comment={review.comment_commitment} />
+                           <ScoreBadge label="Team" score={review.rating_teamwork} comment={review.comment_teamwork} />
+                           <ScoreBadge label="Resp" score={review.rating_responsibility} comment={review.comment_responsibility} />
+                           <ScoreBadge label="Spirit" score={review.rating_spiritual} comment={review.comment_spiritual} />
                         </div>
                       </td>
 
@@ -239,6 +268,18 @@ export const PerformancePage = () => {
                       <td className="px-4 py-3 text-right text-slate-500 text-xs">
                         {new Date(review.review_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                       </td>
+
+                      {isEditor && (
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleEdit(review)}
+                            className="text-slate-300 hover:text-blue-600 transition-colors"
+                            title="Edit Review"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -249,11 +290,12 @@ export const PerformancePage = () => {
       </div>
 
       <ReviewModal
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         onReviewSubmitted={fetchData}
-        members={members}       // <--- Passed Members
-        unitId={selectedUnitId} // <--- Passed Unit ID
+        members={members}
+        unitId={selectedUnitId}
+        initialData={editingReview} // <--- Pass review data for editing
       />
     </div>
   );

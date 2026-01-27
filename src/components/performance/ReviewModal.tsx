@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Star, MessageSquare } from 'lucide-react';
@@ -13,6 +13,7 @@ interface ReviewModalProps {
   onReviewSubmitted: () => void;
   members: any[];
   unitId: string;
+  initialData?: any; // <--- NEW: Data to edit
 }
 
 // Internal Component for a single Rating Row
@@ -30,6 +31,11 @@ const RatingRow = ({
   onChangeComment: (v: string) => void;
 }) => {
   const [showComment, setShowComment] = useState(!!comment);
+
+  // If initial data has a comment, ensure input is shown
+  useEffect(() => {
+    if (comment) setShowComment(true);
+  }, [comment]);
 
   return (
     <div className="py-3 border-b border-slate-50 last:border-0">
@@ -64,7 +70,7 @@ const RatingRow = ({
           type="text"
           placeholder={`Comment for ${label}...`}
           className="w-full mt-1 text-xs border-b border-slate-200 bg-transparent py-1 outline-none focus:border-blue-400 placeholder:text-slate-300"
-          value={comment}
+          value={comment || ''}
           onChange={(e) => onChangeComment(e.target.value)}
         />
       )}
@@ -77,14 +83,15 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   onClose,
   onReviewSubmitted,
   members,
-  unitId
+  unitId,
+  initialData
 }) => {
   const { data: profile } = useProfile();
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     member_id: '',
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM
+    month: new Date().toISOString().slice(0, 7),
 
     // Ratings
     rating_punctuality: 0,
@@ -105,6 +112,45 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     comment: ''
   });
 
+  // Load Initial Data for Editing
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setFormData({
+          member_id: initialData.member_id,
+          month: initialData.month ? initialData.month.slice(0, 7) : new Date(initialData.review_date).toISOString().slice(0, 7),
+
+          rating_punctuality: initialData.rating_punctuality || 0,
+          rating_communication: initialData.rating_communication || 0,
+          rating_commitment: initialData.rating_commitment || 0,
+          rating_teamwork: initialData.rating_teamwork || 0,
+          rating_responsibility: initialData.rating_responsibility || 0,
+          rating_spiritual: initialData.rating_spiritual || 0,
+
+          comment_punctuality: initialData.comment_punctuality || '',
+          comment_communication: initialData.comment_communication || '',
+          comment_commitment: initialData.comment_commitment || '',
+          comment_teamwork: initialData.comment_teamwork || '',
+          comment_responsibility: initialData.comment_responsibility || '',
+          comment_spiritual: initialData.comment_spiritual || '',
+
+          comment: initialData.comment || ''
+        });
+      } else {
+        // Reset for new entry
+        setFormData({
+          member_id: '',
+          month: new Date().toISOString().slice(0, 7),
+          rating_punctuality: 0, rating_communication: 0, rating_commitment: 0,
+          rating_teamwork: 0, rating_responsibility: 0, rating_spiritual: 0,
+          comment_punctuality: '', comment_communication: '', comment_commitment: '',
+          comment_teamwork: '', comment_responsibility: '', comment_spiritual: '',
+          comment: ''
+        });
+      }
+    }
+  }, [isOpen, initialData]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unitId || !formData.member_id) {
@@ -123,12 +169,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('performance_reviews').insert({
+      const payload = {
         unit_id: unitId,
         member_id: formData.member_id,
         reviewer_id: profile?.id,
-        review_date: new Date().toISOString().split('T')[0], // Today
-        month: `${formData.month}-01`, // Target Review Month
+        // If editing, keep original date, else use today
+        review_date: initialData ? initialData.review_date : new Date().toISOString().split('T')[0],
+        month: `${formData.month}-01`,
 
         rating_punctuality: formData.rating_punctuality,
         rating_communication: formData.rating_communication,
@@ -145,22 +192,28 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         comment_spiritual: formData.comment_spiritual,
 
         comment: formData.comment
-      });
+      };
 
-      if (error) throw error;
+      if (initialData) {
+        // UPDATE MODE
+        const { error } = await supabase
+          .from('performance_reviews')
+          .update(payload)
+          .eq('id', initialData.id);
+        if (error) throw error;
+        toast.success("Review updated successfully");
+      } else {
+        // CREATE MODE
+        const { error } = await supabase
+          .from('performance_reviews')
+          .insert(payload);
+        if (error) throw error;
+        toast.success("Review submitted successfully");
+      }
 
-      toast.success("Review submitted successfully");
       onReviewSubmitted();
       onClose();
 
-      // Reset form
-      setFormData(prev => ({
-        ...prev, member_id: '', comment: '',
-        rating_punctuality: 0, rating_communication: 0, rating_commitment: 0,
-        rating_teamwork: 0, rating_responsibility: 0, rating_spiritual: 0,
-        comment_punctuality: '', comment_communication: '', comment_commitment: '',
-        comment_teamwork: '', comment_responsibility: '', comment_spiritual: ''
-      }));
     } catch (err: any) {
       toast.error(err.message || "Failed to submit review");
     } finally {
@@ -169,15 +222,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Performance Review">
+    <Modal isOpen={isOpen} onClose={onClose} title={initialData ? "Edit Review" : "New Performance Review"}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
            <div>
             <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">Member</label>
             <select
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
               value={formData.member_id}
               onChange={e => setFormData({...formData, member_id: e.target.value})}
+              disabled={!!initialData} // Lock member when editing
             >
               <option value="">-- Choose Member --</option>
               {members?.map(m => (
@@ -258,7 +312,9 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} isLoading={loading}>Submit Review</Button>
+          <Button onClick={handleSubmit} isLoading={loading}>
+            {initialData ? "Update Review" : "Submit Review"}
+          </Button>
         </div>
       </form>
     </Modal>

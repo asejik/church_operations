@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Plus, Search, Heart, Trophy, User, Calendar, Phone, Trash2, Loader2, X } from 'lucide-react';
+import { Plus, Search, Heart, Trophy, User, Calendar, Phone, Trash2, Loader2, X, Medal } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { AddSoulReportModal } from '@/components/souls/AddSoulReportModal';
@@ -70,19 +70,18 @@ export const SoulsPage = () => {
   const currentMonthISO = new Date().toISOString().slice(0, 7);
   const monthSouls = records.filter(r => r.report_date.startsWith(currentMonthISO)).length;
 
-  // Top Soul Winner
+  // --- TOP 3 SOUL WINNERS ---
   const winnerCounts: Record<string, number> = {};
-  let topWinnerName = "—";
-  let topWinnerCount = 0;
-
   records.forEach(r => {
     const name = r.members?.full_name || r.soul_winner_name || "Unknown";
     winnerCounts[name] = (winnerCounts[name] || 0) + 1;
-    if (winnerCounts[name] > topWinnerCount) {
-      topWinnerCount = winnerCounts[name];
-      topWinnerName = name;
-    }
   });
+
+  // Convert to array, sort, and take top 3
+  const topWinners = Object.entries(winnerCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
 
   // --- FILTERING ---
   const filteredRecords = records.filter(r => {
@@ -111,6 +110,7 @@ export const SoulsPage = () => {
 
       {/* --- STATS CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* TOTAL CARD */}
         <div className="rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 p-6 text-white shadow-lg relative overflow-hidden flex flex-col justify-between">
           <div className="relative z-10 border-b border-white/20 pb-3 mb-3">
              <div className="flex items-center gap-2 mb-1">
@@ -135,18 +135,36 @@ export const SoulsPage = () => {
           <Heart className="absolute -bottom-4 -right-4 h-32 w-32 text-white opacity-20 rotate-12" />
         </div>
 
-        <div className="rounded-2xl bg-white border border-slate-100 p-6 shadow-sm flex flex-col justify-center">
-           <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-2">
-             <Trophy className="h-4 w-4 text-amber-500" /> Leading Soul Winner
+        {/* TOP 3 WINNERS CARD */}
+        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm flex flex-col">
+           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-4 flex items-center gap-2 border-b border-slate-50 pb-2">
+             <Trophy className="h-4 w-4 text-amber-500" /> Leading Soul Winners
            </h3>
-           <div className="flex items-center gap-4">
-             <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-xl">
-               {topWinnerName[0]}
-             </div>
-             <div>
-               <h4 className="text-xl font-bold text-slate-900">{topWinnerName}</h4>
-               <p className="text-sm text-slate-500">{topWinnerCount} souls won</p>
-             </div>
+
+           <div className="flex-1 space-y-3">
+             {topWinners.length === 0 ? (
+                <div className="text-center text-slate-400 text-sm py-4">No data yet.</div>
+             ) : (
+                topWinners.map((winner, idx) => (
+                  <div key={winner.name} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                        idx === 0 ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-50' :
+                        idx === 1 ? 'bg-slate-100 text-slate-600' :
+                        'bg-orange-50 text-orange-700'
+                      }`}>
+                        {idx === 0 ? <Medal className="h-4 w-4" /> : idx + 1}
+                      </div>
+                      <span className={`font-semibold text-sm ${idx === 0 ? 'text-slate-900' : 'text-slate-600'}`}>
+                        {winner.name}
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold bg-slate-50 px-2 py-1 rounded text-slate-600 group-hover:bg-pink-50 group-hover:text-pink-600 transition-colors">
+                      {winner.count} <span className="font-normal text-slate-400">souls</span>
+                    </div>
+                  </div>
+                ))
+             )}
            </div>
         </div>
       </div>
