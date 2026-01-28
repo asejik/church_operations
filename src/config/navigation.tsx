@@ -24,7 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['smr', 'admin_pastor', 'unit_pastor', 'unit_head', 'evangelist'],
   },
   {
-    label: 'My Unit',
+    label: 'Members',
     href: '/dashboard/members',
     icon: Users,
     roles: ['unit_head', 'unit_pastor', 'smr'],

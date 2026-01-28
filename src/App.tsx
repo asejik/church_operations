@@ -7,7 +7,7 @@ import { Toaster } from 'sonner';
 // Layouts
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { EvangelismLayout } from "@/components/layout/EvangelismLayout"; // <--- NEW IMPORT
+import { EvangelismLayout } from "@/components/layout/EvangelismLayout";
 
 // Unit Dashboard Pages
 import { MembersPage } from "@/pages/dashboard/Members";
@@ -104,13 +104,14 @@ function App() {
           {/* SMR PORTAL ROUTES (Pastor IBK & Dami) */}
           <Route path="/smr" element={<SMRLayout />}>
             <Route index element={<SMRDashboard />} />
-            <Route path="reports" element={<SMRReports />} /> {/* <--- NEW ROUTE */}
-            {/* Reuse existing pages but they will show GLOBAL data because of 'is_smr()' policy */}
+            <Route path="reports" element={<SMRReports />} />
             <Route path="finance" element={<FinancePage />} />
-            <Route path="souls" element={<EvangelismOverview />} /> {/* Reuse Overview */}
+            <Route path="souls" element={<EvangelismOverview />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="performance" element={<PerformancePage />} />
+            {/* ADDED MEMBERS ROUTE BELOW */}
+            <Route path="members" element={<MembersPage />} />
           </Route>
 
         </Routes>

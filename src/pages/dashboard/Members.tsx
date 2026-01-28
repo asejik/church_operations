@@ -5,7 +5,7 @@ import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { BatchUploadModal } from '@/components/members/BatchUploadModal';
 import { MemberDetailsModal } from '@/components/members/MemberDetailsModal';
 import { RequestsTab } from '@/components/members/RequestsTab';
-import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox, X, Loader2 } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox, X, Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { type Member } from '@/lib/db';
@@ -13,10 +13,16 @@ import { type Member } from '@/lib/db';
 export const MembersPage = () => {
   const { data: profile } = useProfile();
 
+  // --- 1. ROLE LOGIC ---
+  const isAdmin = profile?.role === 'smr' || profile?.role === 'admin_pastor';
+
   // TABS STATE
   const [activeTab, setActiveTab] = useState<'members' | 'requests'>('members');
 
-  // MEMBERS DATA STATE
+  // DATA STATE
+  const [units, setUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('all');
+
   const [members, setMembers] = useState<Member[]>([]);
   const [subunits, setSubunits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,24 +40,60 @@ export const MembersPage = () => {
   const [filterEmployment, setFilterEmployment] = useState<string>('all');
   const [filterNYSC, setFilterNYSC] = useState<string>('all');
 
-  // 1. FETCH MEMBERS
+  // --- 2. INITIALIZE UNITS (For Admin/SMR) ---
+  useEffect(() => {
+    const initUnits = async () => {
+      if (!profile) return;
+
+      if (isAdmin) {
+        const { data } = await supabase.from('units').select('id, name').order('name');
+        if (data && data.length > 0) {
+          setUnits(data);
+          // Default to first unit if specific selection needed, or keep 'all'
+          // setSelectedUnitId(data[0].id);
+        }
+      } else if (profile.unit_id) {
+        setSelectedUnitId(profile.unit_id);
+      }
+    };
+    initUnits();
+  }, [profile, isAdmin]);
+
+  // --- 3. FETCH MEMBERS ---
   const fetchData = async () => {
-    if (!profile?.unit_id) return;
+    if (!profile) return;
     setLoading(true);
     try {
-      const { data: memberData, error: memberError } = await supabase
+      // Build Query for Members
+      let memberQuery = supabase
         .from('members')
         .select('*')
-        .eq('unit_id', profile.unit_id)
         .order('full_name');
 
+      // Apply Unit Filter
+      if (isAdmin) {
+        if (selectedUnitId !== 'all') {
+          memberQuery = memberQuery.eq('unit_id', selectedUnitId);
+        }
+      } else {
+        // Unit Heads can only see their own unit
+        memberQuery = memberQuery.eq('unit_id', profile.unit_id);
+      }
+
+      const { data: memberData, error: memberError } = await memberQuery;
       if (memberError) throw memberError;
       setMembers(memberData || []);
 
-      const { data: subunitData } = await supabase
-        .from('subunits')
-        .select('*')
-        .eq('unit_id', profile.unit_id);
+      // Build Query for Subunits (for display names)
+      let subunitQuery = supabase.from('subunits').select('*');
+
+      if (isAdmin && selectedUnitId !== 'all') {
+        subunitQuery = subunitQuery.eq('unit_id', selectedUnitId);
+      } else if (!isAdmin) {
+        subunitQuery = subunitQuery.eq('unit_id', profile.unit_id);
+      }
+
+      const { data: subunitData } = await subunitQuery;
       setSubunits(subunitData || []);
 
     } catch (err: any) {
@@ -64,9 +106,9 @@ export const MembersPage = () => {
 
   useEffect(() => {
     if (activeTab === 'members') fetchData();
-  }, [profile?.unit_id, activeTab]);
+  }, [selectedUnitId, activeTab]); // Re-fetch when unit changes
 
-  // 2. FILTERING & SORTING
+  // 4. FILTERING & SORTING
   const processedMembers = useMemo(() => {
     let result = [...members];
 
@@ -114,9 +156,28 @@ export const MembersPage = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* PAGE HEADER & TAB SWITCHER */}
+      {/* PAGE HEADER & CONTROLS */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Unit Management</h1>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-slate-900">Unit Management</h1>
+
+          {/* UNIT SELECTOR (Global Viewers Only) */}
+          {isAdmin && (
+             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-lg w-fit">
+               <Building2 className="h-4 w-4 text-amber-600 ml-2" />
+               <select
+                 className="bg-transparent border-none text-sm font-bold text-amber-900 focus:ring-0 cursor-pointer min-w-[200px]"
+                 value={selectedUnitId}
+                 onChange={(e) => setSelectedUnitId(e.target.value)}
+               >
+                 <option value="all">All Units</option>
+                 {units.map(u => (
+                   <option key={u.id} value={u.id}>{u.name}</option>
+                 ))}
+               </select>
+             </div>
+           )}
+        </div>
 
         {/* TABS */}
         <div className="flex p-1 bg-slate-100 rounded-lg self-start sm:self-auto">
@@ -128,14 +189,18 @@ export const MembersPage = () => {
           >
             <Users className="h-4 w-4" /> Members
           </button>
-          <button
-            onClick={() => setActiveTab('requests')}
-            className={`flex items-center gap-2 px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
-              activeTab === 'requests' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Inbox className="h-4 w-4" /> Requests
-          </button>
+
+          {/* Only show Requests Tab if NOT SMR (or if SMR wants to see them later, but focusing on Members now) */}
+          {!isAdmin && (
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`flex items-center gap-2 px-4 py-1.5 text-sm font-bold rounded-md transition-all ${
+                activeTab === 'requests' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Inbox className="h-4 w-4" /> Requests
+            </button>
+          )}
         </div>
       </div>
 
@@ -197,7 +262,7 @@ export const MembersPage = () => {
                     <option value="Not Yet">Not Yet</option>
                   </select>
 
-                  {/* Clear Filters Button (Only visible if active) */}
+                  {/* Clear Filters Button */}
                   {(filterEmployment !== 'all' || filterNYSC !== 'all' || searchQuery) && (
                     <Button
                       variant="ghost"
@@ -217,7 +282,7 @@ export const MembersPage = () => {
                  <button onClick={fetchData} className="flex items-center gap-1 text-sm text-blue-600 hover:underline mr-2">
                    <RefreshCw className="h-3 w-3" /> Refresh
                  </button>
-                 {profile?.role !== 'unit_pastor' && (
+                 {!isAdmin && profile?.role !== 'unit_pastor' && (
                   <>
                     <Button variant="outline" size="sm" onClick={() => setIsBatchModalOpen(true)}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Import CSV
@@ -298,7 +363,7 @@ export const MembersPage = () => {
       )}
 
       {/* --- TAB CONTENT: REQUESTS --- */}
-      {activeTab === 'requests' && (
+      {activeTab === 'requests' && !isAdmin && (
         <div className="animate-in fade-in slide-in-from-right-2 duration-300">
           <RequestsTab />
         </div>

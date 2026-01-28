@@ -24,7 +24,7 @@ export const SMRDashboard = () => {
     const fetchExecutiveStats = async () => {
       setLoading(true);
       try {
-        // 1. Pending Requests Count (For Action Items only)
+        // 1. Pending Requests Count
         const { count: pendingCount } = await supabase
           .from('financial_requests')
           .select('*', { count: 'exact', head: true })
@@ -96,6 +96,9 @@ export const SMRDashboard = () => {
                <h3 className="text-2xl font-bold text-slate-900">{stats.totalMembers}</h3>
              </div>
            </div>
+           <Link to="/smr/members" className="mt-4 text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1">
+             View Members <ArrowRight className="h-3 w-3" />
+           </Link>
         </div>
 
         {/* Action Card */}

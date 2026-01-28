@@ -16,7 +16,9 @@ interface MemberDetailsModalProps {
 
 export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, isOpen, onClose, onUpdate }) => {
   const { data: profile } = useProfile();
-  const isReadOnly = profile?.role === 'unit_pastor';
+
+  // UPDATED: SMR and Admins are Read-Only. Only Unit Heads can edit.
+  const isReadOnly = profile?.role === 'unit_pastor' || profile?.role === 'smr' || profile?.role === 'admin_pastor';
 
   // Refs
   const actionSectionRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,6 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
     if (member) {
       setFormData({
         ...member,
-        // Ensure array is initialized to avoid null errors
         employment_status: member.employment_status || []
       });
       setActiveAction(null);
@@ -55,16 +56,21 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
   // 2. Fetch Subunits & Units (Online First)
   useEffect(() => {
     const loadDropdowns = async () => {
-      if (!profile?.unit_id || !isOpen) return;
+      // Allow SMR to see dropdown options (for display) but not edit them
+      if (!isOpen) return;
 
       const { data: units } = await supabase.from('units').select('id, name').order('name');
       if (units) setAvailableUnits(units);
 
-      const { data: subs } = await supabase.from('subunits').select('*').eq('unit_id', profile.unit_id);
-      if (subs) setSubunits(subs);
+      // If viewing a member, fetch subunits for THAT member's unit (for SMR viewing across units)
+      const targetUnitId = member?.unit_id || profile?.unit_id;
+      if (targetUnitId) {
+        const { data: subs } = await supabase.from('subunits').select('*').eq('unit_id', targetUnitId);
+        if (subs) setSubunits(subs);
+      }
     };
     loadDropdowns();
-  }, [isOpen, profile?.unit_id]);
+  }, [isOpen, profile?.unit_id, member?.unit_id]);
 
   // 3. Auto-scroll
   useEffect(() => {
@@ -343,7 +349,6 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
                         checked={(formData.employment_status || []).includes(opt)}
                         onChange={(e) => {
                           const current = formData.employment_status || [];
-                          // Fix: explicitly type the filter function variable
                           const newStatus = e.target.checked
                             ? [...current, opt]
                             : current.filter((i: string) => i !== opt);

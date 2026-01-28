@@ -13,7 +13,8 @@ import {
   Heart,
   BarChart3,
   Package,
-  PieChart
+  PieChart,
+  Calendar
 } from 'lucide-react';
 
 export const SMRLayout = () => {
@@ -27,12 +28,14 @@ export const SMRLayout = () => {
     navigate('/login');
   };
 
+  // REORDERED NAV ITEMS
   const navItems = [
     { label: 'Executive Overview', path: '/smr', icon: LayoutDashboard },
     { label: 'Statistical Reports', path: '/smr/reports', icon: PieChart },
+    { label: 'Members', path: '/smr/members', icon: Users }, // <--- Moved Here
     { label: 'Global Finances', path: '/smr/finance', icon: Wallet },
     { label: 'Soul Center', path: '/smr/souls', icon: Heart },
-    { label: 'Attendance', path: '/smr/attendance', icon: Users },
+    { label: 'Attendance', path: '/smr/attendance', icon: Calendar },
     { label: 'Inventory', path: '/smr/inventory', icon: Package },
     { label: 'Performance', path: '/smr/performance', icon: BarChart3 },
   ];
