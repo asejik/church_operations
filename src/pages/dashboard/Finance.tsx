@@ -3,27 +3,27 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import {
   Plus, Search, CheckCircle, XCircle, Clock, Loader2,
-  MessageSquare, X, ChevronLeft, ChevronRight, FileText
+  MessageSquare, X, ChevronLeft, ChevronRight, FileText, Settings2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { CreateRequestModal } from '@/components/finance/CreateRequestModal';
+import { DecisionModal } from '@/components/finance/DecisionModal';
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 
-// --- MAIN PAGE ---
 export const FinancePage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
   const isAdmin = profile?.role === 'admin_pastor' || profile?.role === 'smr';
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Data
   const [requests, setRequests] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,13 +32,14 @@ export const FinancePage = () => {
     if (!profile) return;
     setLoading(true);
     try {
-      // 1. Fetch Requests (Global or Unit Scoped)
+      // CRITICAL: Added 'reviewer:reviewed_by(full_name, role)' to the select string
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
           *,
           units(name),
-          profiles:requester_id(full_name)
+          profiles:requester_id(full_name),
+          reviewer:reviewed_by(full_name, role)
         `);
 
       if (!isAdmin) {
@@ -49,7 +50,6 @@ export const FinancePage = () => {
       if (error) throw error;
       setRequests(reqData || []);
 
-      // 2. Fetch Units List (For Admin Filters)
       if (isAdmin) {
         const { data: unitsData } = await supabase.from('units').select('id, name').order('name');
         setUnits(unitsData || []);
@@ -69,19 +69,16 @@ export const FinancePage = () => {
 
   // --- FILTER LOGIC ---
   const filterRequests = (item: any) => {
-    // 1. Search Query
     const searchMatch =
       (item.purpose || item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.units?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     if (!searchMatch) return false;
 
-    // 2. Unit Filter (Admin only)
     if (isAdmin && selectedUnit !== 'all') {
       if (item.unit_id !== selectedUnit) return false;
     }
 
-    // 3. Month Filter
     const itemDate = new Date(item.created_at);
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
@@ -96,12 +93,18 @@ export const FinancePage = () => {
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // Month Navigation Helper
   const handleMonthChange = (dir: 'prev' | 'next') => {
     setCurrentDate(curr => dir === 'prev' ? subMonths(curr, 1) : addMonths(curr, 1));
   };
 
   const isCurrentMonth = currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
+
+  // Helper to get friendly role name
+  const getReviewerLabel = (role?: string) => {
+    if (role === 'smr') return 'SMR';
+    if (role === 'admin_pastor') return 'Admin';
+    return 'Admin';
+  };
 
   if (profileLoading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>;
 
@@ -113,7 +116,6 @@ export const FinancePage = () => {
            <p className="text-slate-500">{isAdmin ? 'Review and approve funding requests' : 'Track your submitted funding requests'}</p>
         </div>
 
-        {/* Add Request Button (Unit Heads Only) */}
         {!isAdmin && profile?.role !== 'unit_pastor' && (
            <Button onClick={() => setIsRequestModalOpen(true)}>
              <Plus className="mr-2 h-4 w-4" /> New Request
@@ -135,7 +137,6 @@ export const FinancePage = () => {
          </div>
 
          <div className="flex gap-2 w-full md:w-auto overflow-x-auto items-center">
-            {/* UNIT FILTER (Admin Only) */}
             {isAdmin && (
               <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
@@ -149,7 +150,6 @@ export const FinancePage = () => {
               </select>
             )}
 
-            {/* MONTH NAVIGATOR */}
             <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1">
                <button onClick={() => handleMonthChange('prev')} className="p-1.5 hover:bg-white rounded-md text-slate-500 shadow-sm transition-all"><ChevronLeft className="h-4 w-4" /></button>
                <div className="px-3 text-sm font-bold text-slate-700 min-w-[100px] text-center select-none">
@@ -158,7 +158,6 @@ export const FinancePage = () => {
                <button onClick={() => handleMonthChange('next')} className="p-1.5 hover:bg-white rounded-md text-slate-500 shadow-sm transition-all"><ChevronRight className="h-4 w-4" /></button>
             </div>
 
-            {/* CLEAR FILTERS */}
             {(selectedUnit !== 'all' || searchQuery || !isCurrentMonth) && (
               <Button
                 variant="ghost"
@@ -185,12 +184,13 @@ export const FinancePage = () => {
                 <th className="px-4 py-3 border-r border-slate-100">Details</th>
                 <th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th>
                 <th className="px-4 py-3 w-24 text-right">Date</th>
+                {isAdmin && <th className="px-4 py-3 w-20 text-center">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-2">
                       <FileText className="h-10 w-10 text-slate-300" />
                       <p>No requests found for {format(currentDate, 'MMMM')}.</p>
@@ -210,16 +210,25 @@ export const FinancePage = () => {
                     )}
 
                     <td className="px-4 py-3 text-center border-r border-slate-100">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${
-                        req.status === 'approved' || req.status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
-                        req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                        'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>
-                          {req.status === 'approved' && <CheckCircle className="h-3 w-3" />}
-                          {req.status === 'rejected' && <XCircle className="h-3 w-3" />}
-                          {req.status === 'pending' && <Clock className="h-3 w-3" />}
-                          {req.status}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${
+                          req.status === 'approved' || req.status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                          req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                          'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                            {req.status === 'approved' && <CheckCircle className="h-3 w-3" />}
+                            {req.status === 'rejected' && <XCircle className="h-3 w-3" />}
+                            {req.status === 'pending' && <Clock className="h-3 w-3" />}
+                            {req.status}
+                        </span>
+
+                        {/* REVIEWER LABEL */}
+                        {req.status !== 'pending' && req.reviewer && (
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                            by {getReviewerLabel(req.reviewer.role)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{req.purpose || req.title}</td>
 
@@ -234,7 +243,23 @@ export const FinancePage = () => {
                     </td>
 
                     <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 border-r border-slate-100">{formatCurrency(req.amount)}</td>
-                    <td className="px-4 py-3 text-right text-slate-500 text-xs">{formatDate(req.request_date || req.created_at)}</td>
+                    <td className="px-4 py-3 text-right text-slate-500 text-xs border-r border-slate-100">{formatDate(req.request_date || req.created_at)}</td>
+
+                    {/* Action Column for Admins/SMR */}
+                    {isAdmin && (
+                      <td className="px-4 py-3 text-center">
+                        {req.status === 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => setSelectedRequest(req)}
+                          >
+                            <Settings2 className="h-3 w-3 mr-1" /> Review
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -247,6 +272,13 @@ export const FinancePage = () => {
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
         onRequestCreated={fetchData}
+      />
+
+      <DecisionModal
+        isOpen={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        request={selectedRequest}
+        onComplete={fetchData}
       />
     </div>
   );

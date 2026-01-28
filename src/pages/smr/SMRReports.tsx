@@ -3,8 +3,7 @@ import { supabase } from '@/lib/supabase';
 import {
   Printer,
   TrendingUp,
-  Loader2,
-  Wallet
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -15,11 +14,9 @@ export const SMRReports = () => {
 
   const [data, setData] = useState({
     attendance: [] as any[],
-    requests: [] as any[],
     souls: [] as any[],
     summary: {
       attendanceGrowth: 0,
-      totalSpent: 0,
       soulsTotal: 0
     }
   });
@@ -38,15 +35,7 @@ export const SMRReports = () => {
         .lte('service_date', endOfMonth)
         .order('service_date');
 
-      // 2. Fetch Financial Requests (Approved/Paid Only)
-      const { data: reqData } = await supabase
-        .from('financial_requests')
-        .select('amount, purpose, units(name)')
-        .gte('created_at', startOfMonth)
-        .lte('created_at', endOfMonth)
-        .in('status', ['approved', 'paid']);
-
-      // 3. Fetch Souls
+      // 2. Fetch Souls
       const { data: soulData } = await supabase
         .from('soul_reports')
         .select('count, report_date')
@@ -54,7 +43,6 @@ export const SMRReports = () => {
         .lte('report_date', endOfMonth);
 
       // --- CALCULATIONS ---
-      const totalSpent = reqData?.reduce((acc, c) => acc + c.amount, 0) || 0;
       const totalSouls = soulData?.reduce((acc, c) => acc + c.count, 0) || 0;
 
       const avgAttendance = attData && attData.length > 0
@@ -63,11 +51,9 @@ export const SMRReports = () => {
 
       setData({
         attendance: attData || [],
-        requests: reqData || [],
         souls: soulData || [],
         summary: {
           attendanceGrowth: avgAttendance,
-          totalSpent: totalSpent,
           soulsTotal: totalSouls
         }
       });
@@ -87,9 +73,6 @@ export const SMRReports = () => {
   const handlePrint = () => {
     window.print();
   };
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 print:p-0 print:pb-0 print:max-w-none">
@@ -137,20 +120,14 @@ export const SMRReports = () => {
           <div className="space-y-12">
 
             {/* 1. EXECUTIVE SUMMARY GRID */}
-            <div className="grid grid-cols-3 gap-6">
-               <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center print:border-slate-300">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Spent</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {formatCurrency(data.summary.totalSpent)}
-                  </p>
-               </div>
+            <div className="grid grid-cols-2 gap-6">
                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center print:border-slate-300">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Attendance</p>
-                  <p className="text-2xl font-bold text-slate-900">{data.summary.attendanceGrowth}</p>
+                  <p className="text-3xl font-black text-slate-900">{data.summary.attendanceGrowth}</p>
                </div>
                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center print:border-slate-300">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Souls Won</p>
-                  <p className="text-2xl font-bold text-pink-600">{data.summary.soulsTotal}</p>
+                  <p className="text-3xl font-black text-pink-600">{data.summary.soulsTotal}</p>
                </div>
             </div>
 
@@ -181,32 +158,7 @@ export const SMRReports = () => {
                )}
             </div>
 
-            {/* 3. FINANCIAL OVERVIEW (Approved Requests) */}
-            <div>
-               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                 <Wallet className="h-5 w-5 text-green-600" /> Approved Funding
-               </h3>
-               <div className="space-y-2">
-                 {data.requests.length === 0 ? (
-                    <p className="text-slate-400 italic">No approved financial requests this month.</p>
-                 ) : (
-                    data.requests.slice(0, 5).map((req, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-50 text-sm">
-                         <div>
-                            <p className="font-bold text-slate-800">{req.purpose}</p>
-                            <p className="text-xs text-slate-500">{req.units?.name}</p>
-                         </div>
-                         <p className="font-mono font-bold text-slate-900">{formatCurrency(req.amount)}</p>
-                      </div>
-                    ))
-                 )}
-                 {data.requests.length > 5 && (
-                    <p className="text-xs text-slate-400 text-center italic mt-2">...and {data.requests.length - 5} more items</p>
-                 )}
-               </div>
-            </div>
-
-            {/* 4. SOULS ACQUISITION */}
+            {/* 3. SOULS ACQUISITION */}
             <div>
                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
                  <TrendingUp className="h-5 w-5 text-pink-600" /> Kingdom Expansion

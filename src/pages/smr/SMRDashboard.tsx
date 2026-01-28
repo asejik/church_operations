@@ -3,11 +3,9 @@ import { supabase } from '@/lib/supabase';
 import {
   TrendingUp,
   Users,
-  Wallet,
   Heart,
   ArrowRight,
   Loader2,
-  AlertCircle,
   CheckCircle2,
   BarChart3
 } from 'lucide-react';
@@ -17,7 +15,6 @@ export const SMRDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalSouls: 0,
-    totalSpent: 0,
     pendingRequests: 0,
     totalMembers: 0,
     recentActivity: [] as any[]
@@ -27,19 +24,11 @@ export const SMRDashboard = () => {
     const fetchExecutiveStats = async () => {
       setLoading(true);
       try {
-        // 1. Finance Stats (FROM REQUESTS, NOT LEDGER)
-        // We assume 'approved' or 'paid' requests count as "Spent"
-        const { data: requestsData } = await supabase
+        // 1. Pending Requests Count (For Action Items only)
+        const { count: pendingCount } = await supabase
           .from('financial_requests')
-          .select('amount, status');
-
-        const approvedSpend = requestsData
-          ?.filter(r => r.status === 'approved' || r.status === 'paid')
-          .reduce((acc, curr) => acc + curr.amount, 0) || 0;
-
-        const pendingCount = requestsData
-          ?.filter(r => r.status === 'pending')
-          .length || 0;
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
 
         // 2. Souls Stats
         const { count: soulsCount } = await supabase
@@ -53,8 +42,7 @@ export const SMRDashboard = () => {
 
         setStats({
           totalSouls: soulsCount || 0,
-          totalSpent: approvedSpend,
-          pendingRequests: pendingCount,
+          pendingRequests: pendingCount || 0,
           totalMembers: membersCount || 0,
           recentActivity: []
         });
@@ -69,9 +57,6 @@ export const SMRDashboard = () => {
     fetchExecutiveStats();
   }, []);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
-
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-amber-500" /></div>;
 
   return (
@@ -82,26 +67,7 @@ export const SMRDashboard = () => {
       </div>
 
       {/* --- EXECUTIVE METRICS --- */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-        {/* Finance Card (Updated) */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-           <div className="flex items-center gap-4">
-             <div className="h-12 w-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-               <Wallet className="h-6 w-6" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500">Total Approved Spend</p>
-               <h3 className="text-xl font-bold text-slate-900">{formatCurrency(stats.totalSpent)}</h3>
-             </div>
-           </div>
-           {stats.pendingRequests > 0 && (
-             <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-               <AlertCircle className="h-4 w-4" />
-               <span className="font-bold">{stats.pendingRequests} requests pending</span>
-             </div>
-           )}
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
         {/* Souls Card */}
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -139,7 +105,7 @@ export const SMRDashboard = () => {
            </h3>
            <div className="space-y-2">
              <Link to="/smr/finance" className="block bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg text-sm transition-colors">
-                Review Budgets
+                Review Requests
              </Link>
              <Link to="/smr/attendance" className="block bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg text-sm transition-colors">
                 Check Attendance
