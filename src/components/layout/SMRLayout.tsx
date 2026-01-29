@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
+import { Megaphone } from 'lucide-react';
 import {
   LayoutDashboard,
   LogOut,
@@ -31,8 +32,9 @@ export const SMRLayout = () => {
   // REORDERED NAV ITEMS
   const navItems = [
     { label: 'Executive Overview', path: '/smr', icon: LayoutDashboard },
+    { label: 'Announcements', path: '/smr/announcements', icon: Megaphone },
     { label: 'Statistical Reports', path: '/smr/reports', icon: PieChart },
-    { label: 'Members', path: '/smr/members', icon: Users }, // <--- Moved Here
+    { label: 'Members', path: '/smr/members', icon: Users },
     { label: 'Global Finances', path: '/smr/finance', icon: Wallet },
     { label: 'Soul Center', path: '/smr/souls', icon: Heart },
     { label: 'Attendance', path: '/smr/attendance', icon: Calendar },

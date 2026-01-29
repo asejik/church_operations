@@ -6,7 +6,8 @@ import {
   Box,
   Star,
   Heart,
-  Settings
+  Settings,
+  Megaphone // <--- Import Megaphone icon
 } from 'lucide-react';
 
 export type NavItem = {
@@ -22,6 +23,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['smr', 'admin_pastor', 'unit_pastor', 'unit_head', 'evangelist'],
+  },
+  {
+    label: 'Announcements',
+    href: '/dashboard/announcements',
+    icon: Megaphone,
+    roles: ['unit_head', 'unit_pastor', 'admin_pastor', 'smr'], // Visible to all leadership
   },
   {
     label: 'Members',

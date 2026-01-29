@@ -18,6 +18,7 @@ import { PerformancePage } from "@/pages/dashboard/Performance";
 import { SoulsPage } from "@/pages/dashboard/Souls";
 import { DashboardHome } from "@/pages/dashboard/Home";
 import { SettingsPage } from "@/pages/dashboard/Settings";
+import { AnnouncementsPage } from "@/pages/dashboard/Announcements";
 
 // Admin Pages
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
@@ -83,6 +84,7 @@ function App() {
             <Route path="performance" element={<PerformancePage />} />
             <Route path="souls" element={<SoulsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
 
           {/* ADMIN PORTAL ROUTES (Pastor Queen) */}
@@ -110,8 +112,9 @@ function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="performance" element={<PerformancePage />} />
-            {/* ADDED MEMBERS ROUTE BELOW */}
             <Route path="members" element={<MembersPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
+
           </Route>
 
         </Routes>
