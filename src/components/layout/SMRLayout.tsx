@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
-import { Megaphone } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { toast } from 'sonner';
 import {
   LayoutDashboard,
   LogOut,
@@ -15,21 +17,152 @@ import {
   BarChart3,
   Package,
   PieChart,
-  Calendar
+  Settings,
+  Megaphone,
+  Lock,
+  User
 } from 'lucide-react';
 
+// --- UPDATED SUB-COMPONENT: EDIT PROFILE & SECURITY ---
+const SMRProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boolean; onClose: () => void; profile: any; onUpdate: () => void }) => {
+  const [loading, setLoading] = useState(false);
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+
+  // Password State
+  const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+
+  const handleUpdateName = async () => {
+    if (!profile?.id) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      toast.success("Name updated successfully");
+      onUpdate(); // Refresh global state
+    } catch (err: any) {
+      toast.error("Failed to update name");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (passwords.new.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwords.new
+      });
+
+      if (error) throw error;
+
+      toast.success("Password updated successfully");
+      setPasswords({ new: '', confirm: '' });
+    } catch (err: any) {
+      toast.error("Failed to update password");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Account Settings">
+      <div className="space-y-8">
+
+        {/* SECTION 1: PERSONAL DETAILS */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+            <User className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase">Personal Details</h3>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+            <input
+              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              placeholder="e.g. Pastor Ibk Faleye"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">* This name will appear on the Executive Dashboard.</p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleUpdateName} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">
+              Save Name
+            </Button>
+          </div>
+        </div>
+
+        {/* SECTION 2: SECURITY */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+            <Lock className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase">Security</h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">New Password</label>
+              <input
+                type="password"
+                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                value={passwords.new}
+                onChange={e => setPasswords({ ...passwords, new: e.target.value })}
+                placeholder="••••••"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Confirm Password</label>
+              <input
+                type="password"
+                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
+                value={passwords.confirm}
+                onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
+                placeholder="••••••"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleUpdatePassword} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">
+              Update Password
+            </Button>
+          </div>
+        </div>
+
+      </div>
+    </Modal>
+  );
+};
+
 export const SMRLayout = () => {
-  const { data: profile } = useProfile();
+  const { data: profile, refetch } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
-  // REORDERED NAV ITEMS
   const navItems = [
     { label: 'Executive Overview', path: '/smr', icon: LayoutDashboard },
     { label: 'Announcements', path: '/smr/announcements', icon: Megaphone },
@@ -37,7 +170,7 @@ export const SMRLayout = () => {
     { label: 'Members', path: '/smr/members', icon: Users },
     { label: 'Global Finances', path: '/smr/finance', icon: Wallet },
     { label: 'Soul Center', path: '/smr/souls', icon: Heart },
-    { label: 'Attendance', path: '/smr/attendance', icon: Calendar },
+    { label: 'Attendance', path: '/smr/attendance', icon: Users },
     { label: 'Inventory', path: '/smr/inventory', icon: Package },
     { label: 'Performance', path: '/smr/performance', icon: BarChart3 },
   ];
@@ -54,7 +187,7 @@ export const SMRLayout = () => {
           <p className="text-[10px] text-amber-200/60 mt-1 uppercase tracking-widest">Executive Oversight</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 custom-scrollbar overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path || (item.path !== '/smr' && location.pathname.startsWith(item.path));
@@ -75,20 +208,32 @@ export const SMRLayout = () => {
           })}
         </nav>
 
-        {/* User Profile */}
+        {/* User Profile Section */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-white font-bold border-2 border-slate-800 shadow-md">
+            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center text-white font-bold border-2 border-slate-800 shadow-md shrink-0">
               {profile?.full_name?.[0] || 'S'}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{profile?.full_name}</p>
+              <p className="text-sm font-medium text-white truncate" title={profile?.full_name}>
+                {profile?.full_name || 'SMR User'}
+              </p>
               <p className="text-xs text-amber-400 truncate">Set Man Rep.</p>
             </div>
+
+            {/* Edit Profile Button */}
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
+              title="Account Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
           </div>
+
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-red-400 transition-colors w-full"
+            className="flex items-center gap-2 text-sm text-slate-400 hover:text-red-400 transition-colors w-full px-2"
           >
             <LogOut className="h-4 w-4" /> Sign Out
           </button>
@@ -107,7 +252,7 @@ export const SMRLayout = () => {
 
       {/* MOBILE MENU */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-slate-900 z-20 pt-16 px-4 space-y-4 md:hidden">
+        <div className="fixed inset-0 bg-slate-900 z-20 pt-16 px-4 space-y-4 md:hidden overflow-y-auto">
           {navItems.map((item) => (
              <Link
                 key={item.path}
@@ -119,9 +264,20 @@ export const SMRLayout = () => {
                 {item.label}
               </Link>
           ))}
-          <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-4 w-full text-red-400">
-            <LogOut className="h-5 w-5" /> Sign Out
-          </button>
+          <div className="border-t border-slate-800 pt-4 mt-4">
+             <div className="flex items-center gap-3 px-4 mb-4" onClick={() => setIsProfileModalOpen(true)}>
+                <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
+                  {profile?.full_name?.[0] || 'S'}
+                </div>
+                <div>
+                  <p className="text-white font-bold">{profile?.full_name}</p>
+                  <p className="text-xs text-amber-400">Tap to edit profile</p>
+                </div>
+             </div>
+             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-4 w-full text-red-400">
+               <LogOut className="h-5 w-5" /> Sign Out
+             </button>
+          </div>
         </div>
       )}
 
@@ -129,6 +285,14 @@ export const SMRLayout = () => {
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 max-w-7xl mx-auto w-full">
         <Outlet />
       </main>
+
+      {/* MODALS */}
+      <SMRProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={profile}
+        onUpdate={refetch}
+      />
     </div>
   );
 };
