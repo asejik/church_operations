@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
+import { NotificationBell } from './NotificationBell'; // <--- IMPORT THIS
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -23,30 +24,22 @@ import {
   User
 } from 'lucide-react';
 
-// --- UPDATED SUB-COMPONENT: EDIT PROFILE & SECURITY ---
+// --- SUB-COMPONENT: EDIT PROFILE & SECURITY ---
 const SMRProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boolean; onClose: () => void; profile: any; onUpdate: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [fullName, setFullName] = useState(profile?.full_name || '');
-
-  // Password State
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
 
   const handleUpdateName = async () => {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: fullName })
-        .eq('id', profile.id);
-
+      const { error } = await supabase.from('profiles').update({ full_name: fullName }).eq('id', profile.id);
       if (error) throw error;
-
       toast.success("Name updated successfully");
-      onUpdate(); // Refresh global state
+      onUpdate();
     } catch (err: any) {
       toast.error("Failed to update name");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -61,20 +54,14 @@ const SMRProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boole
       toast.error("Password must be at least 6 characters");
       return;
     }
-
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwords.new
-      });
-
+      const { error } = await supabase.auth.updateUser({ password: passwords.new });
       if (error) throw error;
-
       toast.success("Password updated successfully");
       setPasswords({ new: '', confirm: '' });
     } catch (err: any) {
       toast.error("Failed to update password");
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -83,69 +70,39 @@ const SMRProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boole
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Account Settings">
       <div className="space-y-8">
-
-        {/* SECTION 1: PERSONAL DETAILS */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <User className="h-4 w-4 text-slate-400" />
             <h3 className="text-sm font-bold text-slate-900 uppercase">Personal Details</h3>
           </div>
-
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
-            <input
-              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              placeholder="e.g. Pastor Ibk Faleye"
-            />
+            <input className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Pastor Ibk Faleye" />
             <p className="text-[10px] text-slate-400 mt-1">* This name will appear on the Executive Dashboard.</p>
           </div>
-
           <div className="flex justify-end">
-            <Button size="sm" onClick={handleUpdateName} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">
-              Save Name
-            </Button>
+            <Button size="sm" onClick={handleUpdateName} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">Save Name</Button>
           </div>
         </div>
-
-        {/* SECTION 2: SECURITY */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <Lock className="h-4 w-4 text-slate-400" />
             <h3 className="text-sm font-bold text-slate-900 uppercase">Security</h3>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase">New Password</label>
-              <input
-                type="password"
-                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
-                value={passwords.new}
-                onChange={e => setPasswords({ ...passwords, new: e.target.value })}
-                placeholder="••••••"
-              />
+              <input type="password" className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={passwords.new} onChange={e => setPasswords({ ...passwords, new: e.target.value })} placeholder="••••••" />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase">Confirm Password</label>
-              <input
-                type="password"
-                className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500"
-                value={passwords.confirm}
-                onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
-                placeholder="••••••"
-              />
+              <input type="password" className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={passwords.confirm} onChange={e => setPasswords({ ...passwords, confirm: e.target.value })} placeholder="••••••" />
             </div>
           </div>
-
           <div className="flex justify-end">
-            <Button size="sm" onClick={handleUpdatePassword} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">
-              Update Password
-            </Button>
+            <Button size="sm" onClick={handleUpdatePassword} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">Update Password</Button>
           </div>
         </div>
-
       </div>
     </Modal>
   );
@@ -174,6 +131,9 @@ export const SMRLayout = () => {
     { label: 'Inventory', path: '/smr/inventory', icon: Package },
     { label: 'Performance', path: '/smr/performance', icon: BarChart3 },
   ];
+
+  // Helper to get current page title
+  const currentNav = navItems.find(item => location.pathname === item.path) || navItems[0];
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -220,21 +180,11 @@ export const SMRLayout = () => {
               </p>
               <p className="text-xs text-amber-400 truncate">Set Man Rep.</p>
             </div>
-
-            {/* Edit Profile Button */}
-            <button
-              onClick={() => setIsProfileModalOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
-              title="Account Settings"
-            >
+            <button onClick={() => setIsProfileModalOpen(true)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors" title="Account Settings">
               <Settings className="h-4 w-4" />
             </button>
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-red-400 transition-colors w-full px-2"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-slate-400 hover:text-red-400 transition-colors w-full px-2">
             <LogOut className="h-4 w-4" /> Sign Out
           </button>
         </div>
@@ -245,9 +195,12 @@ export const SMRLayout = () => {
         <span className="font-bold text-amber-400 flex items-center gap-2">
            <Crown className="h-5 w-5" fill="currentColor" /> SMR Portal
         </span>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-3">
+           <NotificationBell />
+           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+             {isMobileMenuOpen ? <X /> : <Menu />}
+           </button>
+        </div>
       </div>
 
       {/* MOBILE MENU */}
@@ -281,9 +234,31 @@ export const SMRLayout = () => {
         </div>
       )}
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 max-w-7xl mx-auto w-full">
-        <Outlet />
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 md:ml-64 flex flex-col min-h-screen transition-all">
+
+        {/* --- DESKTOP HEADER (New!) --- */}
+        <header className="sticky top-0 z-10 hidden md:flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md">
+           <div className="flex items-center gap-2 text-slate-500">
+              <Link to="/smr" className="hover:text-amber-600 transition-colors">Portal</Link>
+              <span className="text-slate-300">/</span>
+              <span className="font-bold text-slate-800">{currentNav.label}</span>
+           </div>
+
+           <div className="flex items-center gap-4">
+              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 uppercase tracking-wide">
+                Executive Access
+              </span>
+              <div className="h-6 w-px bg-slate-200"></div>
+              {/* Notification Bell (Desktop) */}
+              <NotificationBell />
+           </div>
+        </header>
+
+        {/* Page Content */}
+        <div className="p-4 md:p-8 pt-20 md:pt-8 w-full max-w-7xl mx-auto flex-1">
+           <Outlet />
+        </div>
       </main>
 
       {/* MODALS */}

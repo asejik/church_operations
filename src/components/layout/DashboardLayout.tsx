@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Sidebar } from './Sidebar';
+import { Header } from './Header'; // <--- Import the new Header
 import { Background } from './Background';
 import { Outlet } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
@@ -6,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 
 export const DashboardLayout = () => {
   const { isLoading, isError } = useProfile();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Loading State
   if (isLoading) {
@@ -33,14 +36,29 @@ export const DashboardLayout = () => {
       <Background />
 
       {/* Sidebar (Desktop) */}
-      <Sidebar />
+      {/* Note: If your Sidebar supports mobile props, pass isMobileMenuOpen here */}
+      <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block fixed inset-y-0 left-0 z-40 md:relative`}>
+         <Sidebar />
+      </div>
 
       {/* Main Content Area */}
-      <main className="md:pl-64 transition-all duration-300">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="md:pl-64 transition-all duration-300 flex flex-col min-h-screen">
+
+        {/* --- GLOBAL HEADER --- */}
+        <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
+
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
           <Outlet />
         </div>
       </main>
+
+      {/* Mobile Overlay (Closes menu when clicking outside) */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
     </div>
   );
 };
