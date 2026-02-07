@@ -1,152 +1,266 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useSMRStats } from '@/hooks/useSMRStats';
 import {
-  TrendingUp,
-  Users,
-  Heart,
-  ArrowRight,
-  Loader2,
-  CheckCircle2,
-  BarChart3
+  XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer,
+  LineChart, Line, PieChart, Pie, Cell, Legend
+} from 'recharts';
+import {
+  Users, TrendingUp, AlertCircle, Award,
+  Briefcase, GraduationCap, Heart
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
+
+const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444']; // Amber, Blue, Green, Red
 
 export const SMRDashboard = () => {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSouls: 0,
-    pendingRequests: 0,
-    totalMembers: 0,
-    recentActivity: [] as any[]
-  });
+  const { stats, loading } = useSMRStats();
 
-  useEffect(() => {
-    const fetchExecutiveStats = async () => {
-      setLoading(true);
-      try {
-        // 1. Pending Requests Count
-        const { count: pendingCount } = await supabase
-          .from('financial_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
-
-        // 2. Souls Stats
-        const { count: soulsCount } = await supabase
-          .from('soul_reports')
-          .select('*', { count: 'exact', head: true });
-
-        // 3. Members Stats
-        const { count: membersCount } = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true });
-
-        setStats({
-          totalSouls: soulsCount || 0,
-          pendingRequests: pendingCount || 0,
-          totalMembers: membersCount || 0,
-          recentActivity: []
-        });
-
-      } catch (err) {
-        console.error("SMR Load Error", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchExecutiveStats();
-  }, []);
-
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-amber-500" /></div>;
+  if (loading || !stats) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Executive Overview</h1>
-        <p className="text-slate-500">Welcome, Pastor. Here is the ministry's current standing.</p>
+    <div className="space-y-6 pb-20">
+
+      {/* 1. HERO KPI ROW */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Workforce"
+          value={stats.workforce.total}
+          sub={`+${stats.workforce.joinedMonth} this month`}
+          icon={Users}
+          color="bg-blue-50 text-blue-600"
+        />
+        <KpiCard
+          title="Souls Won (YTD)"
+          value={stats.souls.year}
+          sub={`${stats.souls.month} in current month`}
+          icon={Heart}
+          color="bg-pink-50 text-pink-600"
+        />
+        <KpiCard
+          title="Avg. Sunday Service"
+          value={Math.round(stats.attendance.sunday / 4)}
+          sub="Last 30 Days"
+          icon={TrendingUp}
+          color="bg-green-50 text-green-600"
+        />
+        <KpiCard
+          title="Pending Approvals"
+          value={stats.finance.pendingCount}
+          sub="Requires Attention"
+          icon={AlertCircle}
+          color="bg-amber-50 text-amber-600"
+          highlight={stats.finance.pendingCount > 0}
+        />
       </div>
 
-      {/* --- EXECUTIVE METRICS --- */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Souls Card */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-           <div className="flex items-center gap-4">
-             <div className="h-12 w-12 rounded-xl bg-pink-50 text-pink-600 flex items-center justify-center">
-               <Heart className="h-6 w-6" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500">Total Souls</p>
-               <h3 className="text-2xl font-bold text-slate-900">{stats.totalSouls}</h3>
-             </div>
-           </div>
-           <Link to="/smr/souls" className="mt-4 text-xs font-bold text-slate-400 hover:text-pink-600 flex items-center gap-1">
-             View Reports <ArrowRight className="h-3 w-3" />
-           </Link>
+        {/* 2. MAIN CHART: ATTENDANCE TRENDS (Spans 2 cols) */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Attendance Trends</h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.attendance.history}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                <ChartTooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="count" name="Attendance" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        {/* Members Card */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition-shadow">
-           <div className="flex items-center gap-4">
-             <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-               <Users className="h-6 w-6" />
-             </div>
-             <div>
-               <p className="text-sm font-medium text-slate-500">Workforce</p>
-               <h3 className="text-2xl font-bold text-slate-900">{stats.totalMembers}</h3>
-             </div>
-           </div>
-           <Link to="/smr/members" className="mt-4 text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1">
-             View Members <ArrowRight className="h-3 w-3" />
-           </Link>
-        </div>
-
-        {/* Action Card */}
-        <div className="rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 p-6 text-white shadow-lg shadow-amber-200">
-           <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-             <TrendingUp className="h-5 w-5 text-amber-100" /> Quick Actions
-           </h3>
-           <div className="space-y-2">
-             <Link to="/smr/finance" className="block bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg text-sm transition-colors">
-                Review Requests
-             </Link>
-             <Link to="/smr/attendance" className="block bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg text-sm transition-colors">
-                Check Attendance
-             </Link>
-           </div>
-        </div>
-
-      </div>
-
-      {/* --- DASHBOARD SECTIONS --- */}
-      <div className="grid gap-8 md:grid-cols-2">
-         {/* Pending Approvals Section */}
-         <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex items-center justify-between mb-4">
-               <h3 className="font-bold text-slate-900">Pending Financial Approvals</h3>
-               <Link to="/smr/finance" className="text-sm text-amber-600 hover:underline">View All</Link>
-            </div>
-            {stats.pendingRequests === 0 ? (
-               <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-                  <CheckCircle2 className="h-12 w-12 text-green-100 mb-2" />
-                  <p>All clear. No pending requests.</p>
-               </div>
+        {/* 3. FINANCE: SPENDING BY UNIT (Donut) */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-4">Monthly Spending</h3>
+          <div className="h-[300px] w-full flex items-center justify-center">
+            {stats.finance.spendingByUnit.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.finance.spendingByUnit}
+                    cx="50%" cy="50%"
+                    innerRadius={60} outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {stats.finance.spendingByUnit.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
-               <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-amber-800">
-                  You have <span className="font-bold">{stats.pendingRequests} financial requests</span> awaiting your review.
-               </div>
+              <p className="text-slate-400 text-sm">No spending data this month</p>
             )}
-         </div>
-
-         {/* Growth Chart Placeholder */}
-         <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col justify-center items-center text-center">
-            <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
-               <BarChart3 className="h-8 w-8 text-slate-300" />
-            </div>
-            <h3 className="font-bold text-slate-900">Statistical Management Reports</h3>
-            <p className="text-slate-500 text-sm max-w-xs mt-1">Detailed growth analysis and PDF report generation coming soon.</p>
-         </div>
+          </div>
+        </div>
       </div>
+
+      {/* 4. WORKFORCE DEMOGRAPHICS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* A. Status Breakdown */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Employment Status</h3>
+          <div className="space-y-4">
+            <StatRow label="Students" value={stats.workforce.status.student} icon={GraduationCap} color="text-blue-500" />
+            <StatRow label="NYSC" value={stats.workforce.status.nysc} icon={Briefcase} color="text-green-500" />
+            <StatRow label="Employed" value={stats.workforce.status.employed} icon={Briefcase} color="text-slate-700" />
+            <StatRow label="Unemployed" value={stats.workforce.status.unemployed} icon={AlertCircle} color="text-red-500" />
+          </div>
+        </div>
+
+        {/* B. Gender & Marital Ratio */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Demographics</h3>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600">Gender Ratio (M:F)</span>
+              <span className="font-bold text-slate-900">{stats.workforce.gender.ratio}</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2 mb-6">
+              <div
+                className="bg-blue-500 h-2 rounded-full"
+                style={{ width: `${(stats.workforce.gender.male / stats.workforce.total) * 100}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600">Marital Ratio (S:M)</span>
+              <span className="font-bold text-slate-900">{stats.workforce.marital.ratio}</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2">
+              <div
+                className="bg-pink-500 h-2 rounded-full"
+                style={{ width: `${(stats.workforce.marital.single / stats.workforce.total) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-500 uppercase">CES Completion</span>
+              <span className="text-lg font-bold text-amber-600">{stats.workforce.cesRatio}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* C. Performance Watchlist */}
+        <div className="bg-red-50 p-6 rounded-2xl border border-red-100 shadow-sm">
+          <h3 className="text-sm font-bold text-red-800 uppercase mb-4 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" /> Performance Watchlist
+          </h3>
+          {stats.performance.lowPerformers.length > 0 ? (
+            <div className="space-y-3">
+              {stats.performance.lowPerformers.map((p, i) => (
+                <div key={i} className="bg-white p-3 rounded-lg border border-red-100 shadow-sm flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{p.name}</p>
+                    <p className="text-xs text-slate-500">{p.unit}</p>
+                  </div>
+                  <span className="text-xs font-bold bg-red-100 text-red-600 px-2 py-1 rounded-md">
+                    {p.rating.toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-red-300">
+              <Award className="h-8 w-8 mb-2 opacity-50" />
+              <p className="text-sm">All ratings healthy</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 5. SOUL WINNING LEADERBOARD */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <LeaderboardCard
+          title="Top Soul Winners (Year)"
+          data={stats.souls.topWinners}
+          icon={Award}
+          color="text-amber-500"
+        />
+        <LeaderboardCard
+          title="Top Performing Units (Souls)"
+          data={stats.souls.topUnits}
+          icon={Users}
+          color="text-blue-500"
+        />
+      </div>
+
     </div>
   );
 };
+
+// --- SUB-COMPONENTS for Clean Code ---
+
+const KpiCard = ({ title, value, sub, icon: Icon, color, highlight }: any) => (
+  <div className={`p-6 rounded-2xl border ${highlight ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'} shadow-sm transition-all hover:shadow-md`}>
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</p>
+        <h3 className="text-2xl font-bold text-slate-900 mt-1">{typeof value === 'number' ? value.toLocaleString() : value}</h3>
+        <p className="text-xs text-slate-400 mt-1">{sub}</p>
+      </div>
+      <div className={`p-3 rounded-xl ${color}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+    </div>
+  </div>
+);
+
+const StatRow = ({ label, value, icon: Icon, color }: any) => (
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <Icon className={`h-4 w-4 ${color}`} />
+      <span className="text-sm font-medium text-slate-600">{label}</span>
+    </div>
+    <span className="text-sm font-bold text-slate-900">{value}</span>
+  </div>
+);
+
+const LeaderboardCard = ({ title, data, icon: Icon, color }: any) => (
+  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+      <Icon className={`h-5 w-5 ${color}`} /> {title}
+    </h3>
+    <div className="space-y-4">
+      {data.map((item: any, i: number) => (
+        <div key={i} className="flex items-center gap-4">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+            i === 0 ? 'bg-amber-100 text-amber-700' :
+            i === 1 ? 'bg-slate-100 text-slate-600' :
+            'bg-orange-50 text-orange-600'
+          }`}>
+            {i + 1}
+          </div>
+          <div className="flex-1">
+            <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${i === 0 ? 'bg-amber-500' : 'bg-slate-300'}`}
+                style={{ width: `${(item.count / (data[0].count || 1)) * 100}%` }}
+              />
+            </div>
+          </div>
+          <div className="w-24 text-right">
+            <p className="text-sm font-bold text-slate-800 truncate">{item.name}</p>
+            <p className="text-xs text-slate-500">{item.count} souls</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
