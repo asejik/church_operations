@@ -30,6 +30,7 @@ import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
 import { SMRLayout } from "@/components/layout/SMRLayout";
 import { SMRDashboard } from "@/pages/smr/SMRDashboard";
 import { SMRReports } from "@/pages/smr/SMRReports";
+import { Debug } from "@/pages/smr/Debug";
 
 // Simple Landing Page Component
 const LandingPage = () => {
@@ -114,6 +115,7 @@ function App() {
             <Route path="performance" element={<PerformancePage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="debug" element={<Debug />} />
 
           </Route>
 
