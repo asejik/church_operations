@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
-import { Plus, Search, Package, AlertTriangle, CheckCircle, HelpCircle, Loader2, X } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, CheckCircle, HelpCircle, Loader2, X, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
@@ -9,10 +9,13 @@ import { AddItemModal } from '@/components/inventory/AddItemModal';
 export const InventoryPage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
-  // FIX: SMR counts as Admin for Global View
   const isAdmin = profile?.role === 'admin_pastor' || profile?.role === 'smr';
+  // Allow editing if you are NOT an admin (Unit Head) or if you are an Admin (Global Edit)
+  // Adjust this logic if you want to restrict Admins from editing unit items directly
+  const canEdit = !isAdmin || isAdmin;
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null); // State for item being edited
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -51,6 +54,16 @@ export const InventoryPage = () => {
   useEffect(() => {
     fetchInventory();
   }, [profile?.unit_id, isAdmin]);
+
+  const handleEdit = (item: any) => {
+    setEditingItem(item);
+    setIsModalOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
+  };
 
   const getConditionBadge = (c: string) => {
     if (c === 'new' || c === 'good') return 'bg-green-100 text-green-700 border-green-200';
@@ -146,7 +159,7 @@ export const InventoryPage = () => {
             )}
 
             {!isAdmin && profile?.role !== 'unit_pastor' && (
-              <Button size="sm" className="h-10" onClick={() => setIsAddOpen(true)}>
+              <Button size="sm" className="h-10" onClick={handleAddNew}>
                 <Plus className="mr-2 h-4 w-4" /> Add Item
               </Button>
             )}
@@ -164,16 +177,18 @@ export const InventoryPage = () => {
                   <th className="px-4 py-4 w-12 border-r border-slate-100">S/N</th>
                   {isAdmin && <th className="px-4 py-4 border-r border-slate-100">Unit</th>}
                   <th className="px-4 py-4 border-r border-slate-100">Item Name</th>
-                  <th className="px-4 py-4 border-r border-slate-100">Date Purchased</th> {/* NEW COLUMN */}
+                  <th className="px-4 py-4 border-r border-slate-100">Date Purchased</th>
                   <th className="px-4 py-4 border-r border-slate-100">Condition</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center">Qty</th>
                   <th className="px-4 py-4">Notes</th>
+                  {/* EDIT ACTION COLUMN */}
+                  {canEdit && <th className="px-4 py-4 w-12 text-center"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.length === 0 ? (
                    <tr>
-                     <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-500">
+                     <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
                        <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
                        No items found matching filters.
                      </td>
@@ -192,7 +207,6 @@ export const InventoryPage = () => {
                       <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
                         {item.item_name}
                       </td>
-                      {/* DATE PURCHASED CELL */}
                       <td className="px-4 py-3 text-slate-600 border-r border-slate-100 whitespace-nowrap">
                         {formatDate(item.date_purchased)}
                       </td>
@@ -208,6 +222,19 @@ export const InventoryPage = () => {
                       <td className="px-4 py-3 text-slate-500 text-xs max-w-[200px] truncate" title={item.notes}>
                         {item.notes || "—"}
                       </td>
+
+                      {/* EDIT BUTTON */}
+                      {canEdit && (
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Edit Item"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -216,10 +243,12 @@ export const InventoryPage = () => {
           )}
         </div>
       </div>
+
       <AddItemModal
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        onItemAdded={fetchInventory}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchInventory} // Renamed prop usage
+        itemToEdit={editingItem}   // Pass selected item
       />
     </div>
   );

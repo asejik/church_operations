@@ -1,15 +1,15 @@
 import { useSMRStats } from '@/hooks/useSMRStats';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, Legend
+  LineChart, Line, PieChart, Pie, Cell, Legend, BarChart, Bar
 } from 'recharts';
 import {
   Users, TrendingUp, AlertCircle, Award,
-  Briefcase, GraduationCap, Heart
+  Heart, HelpCircle
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
-const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444']; // Amber, Blue, Green, Red
+const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6'];
 
 export const SMRDashboard = () => {
   const { stats, loading } = useSMRStats();
@@ -108,17 +108,29 @@ export const SMRDashboard = () => {
         </div>
       </div>
 
-      {/* 4. WORKFORCE DEMOGRAPHICS GRID */}
+      {/* 4. OPERATIONAL INSIGHTS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-        {/* A. Status Breakdown */}
+        {/* A. ABSENCE REPORT */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Employment Status</h3>
-          <div className="space-y-4">
-            <StatRow label="Students" value={stats.workforce.status.student} icon={GraduationCap} color="text-blue-500" />
-            <StatRow label="NYSC" value={stats.workforce.status.nysc} icon={Briefcase} color="text-green-500" />
-            <StatRow label="Employed" value={stats.workforce.status.employed} icon={Briefcase} color="text-slate-700" />
-            <StatRow label="Unemployed" value={stats.workforce.status.unemployed} icon={AlertCircle} color="text-red-500" />
+          <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2">
+            <HelpCircle className="h-4 w-4" /> Top Absence Reasons
+          </h3>
+          <div className="h-[200px] w-full">
+            {stats.attendance.absenceReasons.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={stats.attendance.absenceReasons}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="reason" type="category" width={100} tick={{fontSize: 11}} interval={0} />
+                  <ChartTooltip />
+                  <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                No absence data yet
+              </div>
+            )}
           </div>
         </div>
 
@@ -219,16 +231,6 @@ const KpiCard = ({ title, value, sub, icon: Icon, color, highlight }: any) => (
         <Icon className="h-5 w-5" />
       </div>
     </div>
-  </div>
-);
-
-const StatRow = ({ label, value, icon: Icon, color }: any) => (
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-3">
-      <Icon className={`h-4 w-4 ${color}`} />
-      <span className="text-sm font-medium text-slate-600">{label}</span>
-    </div>
-    <span className="text-sm font-bold text-slate-900">{value}</span>
   </div>
 );
 

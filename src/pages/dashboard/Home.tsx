@@ -6,7 +6,10 @@ import { AdminHome } from './AdminHome';
 import { ReportModal } from '@/components/dashboard/ReportModal';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Users, User, Calendar, Settings, Plus, Layers, PieChart, Lock, Loader2, Download, Trash2 } from 'lucide-react';
+import {
+  Users, User, Calendar, Settings, Plus, Layers, PieChart, Lock, Loader2, Download, Trash2,
+  Sun, CloudSun, Home, Briefcase
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 // --- SUB-COMPONENT: UNIT PROFILE MODAL ---
@@ -143,6 +146,17 @@ const SubunitsModal = ({ isOpen, onClose, onUpdate }: { isOpen: boolean; onClose
   );
 };
 
+// --- SUB-COMPONENT: ATTENDANCE CARD ---
+const AttendanceCard = ({ label, value, icon: Icon, color, bg }: any) => (
+  <div className={`rounded-xl border border-slate-100 p-3 ${bg} bg-opacity-30`}>
+    <div className={`mb-2 ${color}`}>
+      <Icon className="h-5 w-5" />
+    </div>
+    <p className="text-2xl font-bold text-slate-900">{value > 0 ? value : '-'}</p>
+    <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wide mt-1">{label}</p>
+  </div>
+);
+
 // --- MAIN DASHBOARD COMPONENT ---
 export const DashboardHome = () => {
   const { data: profile } = useProfile();
@@ -220,8 +234,10 @@ export const DashboardHome = () => {
 
       {/* DASHBOARD GRID */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Live Stats */}
+        {/* Live Stats Column (2/3 width) */}
         <div className="space-y-6 lg:col-span-2">
+
+          {/* Row 1: Membership & Subunits */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Membership */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -247,12 +263,51 @@ export const DashboardHome = () => {
               )}
             </div>
           </div>
+
+          {/* Row 2: Attendance Health (NEW) */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500 mb-4">
+              <Calendar className="h-4 w-4" /> Avg. Attendance (Last 90 Days)
+            </h3>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <AttendanceCard
+                label="Sunday"
+                value={stats.attendance?.sunday}
+                icon={Sun}
+                color="text-amber-500"
+                bg="bg-amber-50"
+              />
+              <AttendanceCard
+                label="Midweek"
+                value={stats.attendance?.midweek}
+                icon={CloudSun}
+                color="text-blue-500"
+                bg="bg-blue-50"
+              />
+              <AttendanceCard
+                label="Family Mtg"
+                value={stats.attendance?.family}
+                icon={Home}
+                color="text-green-500"
+                bg="bg-green-50"
+              />
+              <AttendanceCard
+                label="Unit Mtg"
+                value={stats.attendance?.unit}
+                icon={Briefcase}
+                color="text-purple-500"
+                bg="bg-purple-50"
+              />
+            </div>
+          </div>
+
         </div>
 
-        {/* Birthdays */}
+        {/* Birthdays Column (1/3 width) */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:row-span-2 h-full">
            <div className="flex items-center gap-2 text-slate-500 mb-4 border-b border-slate-100 pb-2"><Calendar className="h-4 w-4 text-pink-500" /><h3 className="text-xs font-bold uppercase">Birthdays (This Month)</h3></div>
-           <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
              {birthdays.length === 0 ? <div className="text-center py-8"><p className="text-sm text-slate-400 italic">No birthdays this month.</p></div> : birthdays.map(m => {
                  const day = new Date(m.dob!).getDate();
                  const isToday = day === new Date().getDate();

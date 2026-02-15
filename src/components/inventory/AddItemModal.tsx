@@ -9,10 +9,11 @@ import { toast } from 'sonner';
 interface AddItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onItemAdded: () => void;
+  onSuccess: () => void; // Renamed for clarity (was onItemAdded)
+  itemToEdit?: any;      // New Prop: The item being edited
 }
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onItemAdded }) => {
+export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onSuccess, itemToEdit }) => {
   const { data: profile } = useProfile();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -23,18 +24,30 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
     notes: ''
   });
 
-  // Reset form when modal opens
+  // Populate form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setFormData({
-        item_name: '',
-        quantity: '1',
-        condition: 'good',
-        date_purchased: new Date().toISOString().slice(0, 10),
-        notes: ''
-      });
+      if (itemToEdit) {
+        // Edit Mode
+        setFormData({
+          item_name: itemToEdit.item_name || '',
+          quantity: itemToEdit.quantity?.toString() || '1',
+          condition: itemToEdit.condition || 'good',
+          date_purchased: itemToEdit.date_purchased || new Date().toISOString().slice(0, 10),
+          notes: itemToEdit.notes || ''
+        });
+      } else {
+        // Add Mode (Reset)
+        setFormData({
+          item_name: '',
+          quantity: '1',
+          condition: 'good',
+          date_purchased: new Date().toISOString().slice(0, 10),
+          notes: ''
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, itemToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,30 +55,48 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('inventory').insert({
-        unit_id: profile.unit_id,
-        item_name: formData.item_name,
-        quantity: parseInt(formData.quantity),
-        condition: formData.condition,
-        date_purchased: formData.date_purchased,
-        notes: formData.notes
-      });
+      if (itemToEdit) {
+        // UPDATE EXISTING ITEM
+        const { error } = await supabase
+          .from('inventory')
+          .update({
+            item_name: formData.item_name,
+            quantity: parseInt(formData.quantity),
+            condition: formData.condition,
+            date_purchased: formData.date_purchased,
+            notes: formData.notes
+          })
+          .eq('id', itemToEdit.id); // Target specific item
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("Item updated successfully");
+      } else {
+        // CREATE NEW ITEM
+        const { error } = await supabase.from('inventory').insert({
+          unit_id: profile.unit_id,
+          item_name: formData.item_name,
+          quantity: parseInt(formData.quantity),
+          condition: formData.condition,
+          date_purchased: formData.date_purchased,
+          notes: formData.notes
+        });
 
-      toast.success("Item added to inventory");
-      onItemAdded();
+        if (error) throw error;
+        toast.success("Item added to inventory");
+      }
+
+      onSuccess();
       onClose();
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Failed to add item");
+      toast.error(err.message || "Failed to save item");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add Equipment">
+    <Modal isOpen={isOpen} onClose={onClose} title={itemToEdit ? "Edit Equipment" : "Add Equipment"}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">Item Name</label>
@@ -126,7 +157,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onI
 
         <div className="pt-2">
           <Button type="submit" className="w-full" isLoading={loading}>
-            Save Item
+            {itemToEdit ? "Update Item" : "Save Item"}
           </Button>
         </div>
       </form>

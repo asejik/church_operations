@@ -19,6 +19,7 @@ export interface SMRStats {
     family: number;
     avgMonthly: number;
     history: { date: string; type: string; count: number }[];
+    absenceReasons: { reason: string; count: number }[]; // <--- NEW
   };
   finance: {
     spendingByUnit: { name: string; value: number }[];
@@ -55,7 +56,7 @@ export const useSMRStats = () => {
       const unitLookup = new Map<string, string>();
       unitsData?.forEach(u => unitLookup.set(u.id, u.name));
 
-      // 2. WORKFORCE FETCH (Raw fetch, no joins)
+      // 2. WORKFORCE FETCH
       const { data: members, error: memberError } = await supabase
         .from('members')
         .select('*');
@@ -95,34 +96,50 @@ export const useSMRStats = () => {
       // 3. ATTENDANCE FETCH
       const { data: attendanceData } = await supabase
         .from('attendance')
-        .select('*, events!inner(event_type)') // Keep this join if it works, otherwise separate
-        .eq('status', 'present')
+        .select('*, events!inner(event_type)')
+        // .eq('status', 'present') <--- REMOVED to catch Absentees
         .gte('event_date', threeMonthsAgo);
 
       let sundayCount = 0;
       let midweekCount = 0;
       let familyCount = 0;
       const historyMap = new Map<string, { date: string, type: string, count: number }>();
+      const absenceMap = new Map<string, number>(); // <--- NEW
 
       attendanceData?.forEach((record: any) => {
-        // Handle join result safely
-        const type = record.events?.event_type || 'Unknown';
-        const dateKey = record.event_date.split('T')[0];
-
-        if (type.toLowerCase().includes('sunday')) sundayCount++;
-        if (type.toLowerCase().includes('midweek')) midweekCount++;
-        if (type.toLowerCase().includes('family')) familyCount++;
-
-        if (!historyMap.has(dateKey)) {
-          historyMap.set(dateKey, {
-            date: format(new Date(record.event_date), 'MMM d'),
-            type: type,
-            count: 0
-          });
+        // Handle Absence Reasons
+        if (record.status === 'absent' && record.reason) {
+           // Normalize: Capitalize first letter, trim
+           const raw = record.reason.trim();
+           const reason = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+           if (reason) absenceMap.set(reason, (absenceMap.get(reason) || 0) + 1);
         }
-        const entry = historyMap.get(dateKey);
-        if (entry) entry.count += 1;
+
+        // Handle Present Counts (Only count if status is present)
+        if (record.status === 'present') {
+            const type = record.events?.event_type || 'Unknown';
+            const dateKey = record.event_date.split('T')[0];
+
+            if (type.toLowerCase().includes('sunday')) sundayCount++;
+            if (type.toLowerCase().includes('midweek')) midweekCount++;
+            if (type.toLowerCase().includes('family')) familyCount++;
+
+            if (!historyMap.has(dateKey)) {
+              historyMap.set(dateKey, {
+                date: format(new Date(record.event_date), 'MMM d'),
+                type: type,
+                count: 0
+              });
+            }
+            const entry = historyMap.get(dateKey);
+            if (entry) entry.count += 1;
+        }
       });
+
+      const topAbsenceReasons = Array.from(absenceMap.entries())
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
 
       // 4. FINANCE FETCH
       const { data: expenses } = await supabase
@@ -141,7 +158,7 @@ export const useSMRStats = () => {
         spendMap.set(uName, (spendMap.get(uName) || 0) + e.amount);
       });
 
-      // 5. SOULS FETCH (Raw fetch)
+      // 5. SOULS FETCH
       const { data: souls } = await supabase
         .from('soul_reports')
         .select('*')
@@ -152,9 +169,6 @@ export const useSMRStats = () => {
       const unitSoulMap = new Map();
 
       souls?.forEach((s: any) => {
-        // For name, we might need a separate profile lookup, but let's use the text field if available
-        // or just 'Member' if we don't fetch profiles.
-        // Ideally we fetch profiles separately if needed, but let's rely on soul_winner_name first
         const name = s.soul_winner_name || 'Member';
         winnerMap.set(name, (winnerMap.get(name) || 0) + 1);
 
@@ -168,7 +182,6 @@ export const useSMRStats = () => {
         .select('*')
         .limit(20);
 
-      // Fetch member names for reviews manually since we aren't joining
       const memberIds = reviews?.map(r => r.member_id) || [];
       const { data: reviewMembers } = await supabase
         .from('members')
@@ -207,7 +220,8 @@ export const useSMRStats = () => {
           sunday: sundayCount,
           family: familyCount,
           avgMonthly: 0,
-          history: Array.from(historyMap.values()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          history: Array.from(historyMap.values()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+          absenceReasons: topAbsenceReasons // <--- Added
         },
         finance: {
           spendingByUnit: Array.from(spendMap).map(([name, value]) => ({ name, value: value as number })),
