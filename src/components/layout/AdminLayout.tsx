@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
-import { NotificationBell } from './NotificationBell'; // <--- Added
+import { NotificationBell } from './NotificationBell';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -13,10 +13,11 @@ import {
   LogOut,
   Menu,
   X,
-  Megaphone, // <--- Added for Announcements
-  Settings,  // <--- Added for Profile Edit
+  Megaphone,
+  Settings,
   Lock,
-  User
+  User,
+  ChevronDown
 } from 'lucide-react';
 
 // --- SUB-COMPONENT: ADMIN PROFILE MODAL ---
@@ -108,20 +109,32 @@ export const AdminLayout = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
+  // Close User Menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const navItems = [
     { label: 'Overview', path: '/admin', icon: LayoutDashboard },
-    { label: 'Announcements', path: '/admin/announcements', icon: Megaphone }, // <--- Added
+    { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
     { label: 'Global Finances', path: '/admin/finance', icon: Wallet },
     { label: 'Global Inventory', path: '/admin/inventory', icon: Package },
   ];
 
-  // Helper to get current page title
   const currentNav = navItems.find(item => location.pathname === item.path) || navItems[0];
 
   return (
@@ -155,7 +168,7 @@ export const AdminLayout = () => {
           })}
         </nav>
 
-        {/* User Profile Snippet */}
+        {/* User Profile Snippet (Bottom Sidebar) */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/50">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
@@ -165,14 +178,6 @@ export const AdminLayout = () => {
               <p className="text-sm font-medium text-white truncate" title={profile?.full_name}>{profile?.full_name}</p>
               <p className="text-xs text-amber-500 truncate">Admin Pastor</p>
             </div>
-            {/* Edit Profile Button */}
-            <button
-              onClick={() => setIsProfileModalOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
-              title="Account Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
           </div>
           <button
             onClick={handleLogout}
@@ -191,7 +196,6 @@ export const AdminLayout = () => {
            </button>
            <span className="font-bold text-amber-500">Admin Portal</span>
         </div>
-        {/* Mobile Notification Bell */}
         <NotificationBell />
       </div>
 
@@ -229,7 +233,7 @@ export const AdminLayout = () => {
       {/* MAIN CONTENT */}
       <main className="flex-1 md:ml-64 flex flex-col min-h-screen transition-all">
 
-        {/* --- DESKTOP HEADER (For Notifications & Breadcrumbs) --- */}
+        {/* --- DESKTOP HEADER --- */}
         <header className="sticky top-0 z-10 hidden md:flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md">
            <div className="flex items-center gap-2 text-slate-500">
               <Link to="/admin" className="hover:text-amber-600 transition-colors">Portal</Link>
@@ -238,12 +242,49 @@ export const AdminLayout = () => {
            </div>
 
            <div className="flex items-center gap-4">
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wide">
-                Admin Access
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wide">
+                  Admin Access
+                </span>
+                <NotificationBell />
+              </div>
+
               <div className="h-6 w-px bg-slate-200"></div>
-              {/* Desktop Notification Bell */}
-              <NotificationBell />
+
+              {/* USER PROFILE DROPDOWN */}
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 hover:bg-slate-100 p-1.5 rounded-lg transition-colors"
+                >
+                  <div className="h-8 w-8 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                    {profile?.full_name?.[0] || 'A'}
+                  </div>
+                  <span className="text-sm font-medium text-slate-700 max-w-[120px] truncate">{profile?.full_name}</span>
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 py-1 animation-fade-in">
+                    <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/50">
+                      <p className="text-sm font-bold text-slate-900 truncate">{profile?.full_name}</p>
+                      <p className="text-xs text-slate-500 truncate">Admin Pastor</p>
+                    </div>
+                    <button
+                      onClick={() => { setIsProfileModalOpen(true); setIsUserMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Settings className="h-4 w-4 text-slate-400" /> Account Settings
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" /> Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
            </div>
         </header>
 
@@ -253,7 +294,6 @@ export const AdminLayout = () => {
         </div>
       </main>
 
-      {/* Profile Modal */}
       <AdminProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
