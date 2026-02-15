@@ -92,17 +92,15 @@ function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="inventory" element={<InventoryPage />} />
-            {/* Added Announcements Route */}
             <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
 
           {/* EVANGELISM OVERSIGHT ROUTES */}
           <Route path="/evangelism" element={<EvangelismLayout />}>
-            {/* 1. Overview Page (Stats only) */}
             <Route index element={<EvangelismOverview />} />
-
-            {/* 2. Reports Page (Table only) */}
             <Route path="reports" element={<EvangelismReports />} />
+            {/* Added Announcements Route */}
+            <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
 
           {/* SMR PORTAL ROUTES (Pastor IBK & Dami) */}
@@ -116,7 +114,6 @@ function App() {
             <Route path="performance" element={<PerformancePage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
-
           </Route>
 
         </Routes>
