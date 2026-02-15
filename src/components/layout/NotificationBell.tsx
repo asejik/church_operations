@@ -13,18 +13,21 @@ export const NotificationBell = () => {
 
   // Counters & Data
   const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
-  const [pendingRequests, setPendingRequests] = useState(0); // For SMR
-  const [notifications, setNotifications] = useState<any[]>([]); // For Unit Heads
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
-  const isSMR = profile?.role === 'smr' || profile?.role === 'admin_pastor';
+  // Role Checks
+  const isSMR = profile?.role === 'smr';
+  const isAdmin = profile?.role === 'admin_pastor';
+  const isExecutive = isSMR || isAdmin; // Both can view global stuff
 
   // 1. Data Fetcher
   const fetchData = async () => {
     if (!profile) return;
 
     try {
-      // A. Unread Announcements (ONLY for non-SMR users)
-      if (!isSMR) {
+      // A. Unread Announcements (ONLY for non-executive users)
+      if (!isExecutive) {
         const { data: reads } = await supabase.from('announcement_reads').select('announcement_id').eq('user_id', profile.id);
         const readIds = new Set(reads?.map(r => r.announcement_id));
 
@@ -35,13 +38,13 @@ export const NotificationBell = () => {
         setUnreadAnnouncements(0);
       }
 
-      // B. Pending Requests (SMR Only)
-      if (isSMR) {
+      // B. Pending Requests (Executives Only)
+      if (isExecutive) {
         const { count } = await supabase.from('financial_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
         setPendingRequests(count || 0);
       }
 
-      // C. Personal Notifications (Unit Heads)
+      // C. Personal Notifications (Unit Heads / General)
       const { data: notifs } = await supabase
         .from('notifications')
         .select('*')
@@ -78,31 +81,30 @@ export const NotificationBell = () => {
     // Initial Fetch
     fetchData();
 
-    // Unique channel for this user to prevent collisions
     const channel = supabase.channel(`bell:${profile.id}`)
-      // A. Announcements (IGNORED IF SMR)
+      // A. Announcements
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => {
-        if (isSMR) return; // <--- SMRs don't need alerts for this
+        if (isExecutive) return;
 
         setUnreadAnnouncements(prev => prev + 1);
         toast.info("New Announcement", { description: "Leadership posted an update." });
         triggerBrowserNotification("New Announcement", "Leadership posted an update.");
       })
-      // B. Read Receipts (Syncs across devices/tabs)
+      // B. Read Receipts
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcement_reads', filter: `user_id=eq.${profile.id}` }, () => {
-        if (!isSMR) {
+        if (!isExecutive) {
            setUnreadAnnouncements(prev => Math.max(0, prev - 1));
         }
       })
-      // C. Personal Notifications (Approvals/Rejections)
+      // C. Personal Notifications
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, (payload) => {
         setNotifications(prev => [payload.new, ...prev]);
         toast.info(payload.new.title, { description: payload.new.message });
         triggerBrowserNotification(payload.new.title, payload.new.message);
       })
-      // D. SMR Pending Requests
+      // D. Pending Requests (For Executives)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'financial_requests' }, (payload) => {
-        if (isSMR && payload.new.status === 'pending') {
+        if (isExecutive && payload.new.status === 'pending') {
            setPendingRequests(prev => prev + 1);
            toast.info("New Financial Request");
            triggerBrowserNotification("New Financial Request", "A new request needs your review.");
@@ -110,7 +112,6 @@ export const NotificationBell = () => {
       })
       .subscribe();
 
-    // Backup: Refetch when window regains focus (handles missed packets)
     const onFocus = () => fetchData();
     window.addEventListener('focus', onFocus);
 
@@ -118,7 +119,7 @@ export const NotificationBell = () => {
       supabase.removeChannel(channel);
       window.removeEventListener('focus', onFocus);
     };
-  }, [profile, isSMR]);
+  }, [profile, isExecutive]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -134,18 +135,12 @@ export const NotificationBell = () => {
   // --- ACTIONS ---
 
   const markNotificationRead = async (id: string) => {
-    // 1. Optimistic Update (Remove red dot immediately)
     setNotifications(prev => prev.filter(n => n.id !== id));
-
-    // 2. Update DB
     await supabase.from('notifications').update({ is_read: true }).eq('id', id);
   };
 
   const handleNotificationClick = (notif: any) => {
-    // 1. Mark as Read
     markNotificationRead(notif.id);
-
-    // 2. Navigate
     if (notif.link) {
       navigate(notif.link);
       setIsOpen(false);
@@ -155,6 +150,18 @@ export const NotificationBell = () => {
   const handleNavigate = (path: string) => {
     navigate(path);
     setIsOpen(false);
+  };
+
+  // --- SMART ROUTING FOR FINANCE ---
+  const handleFinanceClick = () => {
+    setIsOpen(false);
+    if (isSMR) {
+      navigate('/smr/finance');
+    } else if (isAdmin) {
+      navigate('/admin/finance');
+    } else {
+      navigate('/dashboard/finance');
+    }
   };
 
   const totalCount = unreadAnnouncements + pendingRequests + notifications.length;
@@ -186,8 +193,8 @@ export const NotificationBell = () => {
               </div>
             )}
 
-            {/* 1. ANNOUNCEMENTS (Hidden for SMR) */}
-            {!isSMR && unreadAnnouncements > 0 && (
+            {/* 1. ANNOUNCEMENTS (Hidden for Executives) */}
+            {!isExecutive && unreadAnnouncements > 0 && (
               <div
                 onClick={() => handleNavigate('/dashboard/announcements')}
                 className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer group"
@@ -198,16 +205,16 @@ export const NotificationBell = () => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">Unread Announcements</p>
-                    <p className="text-xs text-slate-500 mt-0.5">You have {unreadAnnouncements} new announcements from leadership.</p>
+                    <p className="text-xs text-slate-500 mt-0.5">You have {unreadAnnouncements} new announcements.</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 2. PENDING REQUESTS (SMR Only) */}
-            {isSMR && pendingRequests > 0 && (
+            {/* 2. PENDING REQUESTS (Executives) */}
+            {isExecutive && pendingRequests > 0 && (
               <div
-                onClick={() => handleNavigate('/smr/finance')}
+                onClick={handleFinanceClick}
                 className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer group"
               >
                 <div className="flex items-start gap-3">
@@ -222,7 +229,7 @@ export const NotificationBell = () => {
               </div>
             )}
 
-            {/* 3. PERSONAL NOTIFICATIONS (Unit Heads) */}
+            {/* 3. PERSONAL NOTIFICATIONS */}
             {notifications.map((notif) => (
               <div
                 key={notif.id}

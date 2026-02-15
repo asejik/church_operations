@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Header } from './Header'; // <--- Import the new Header
+import { Header } from './Header';
 import { Background } from './Background';
 import { Outlet } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
 
 export const DashboardLayout = () => {
-  const { isLoading, isError } = useProfile();
+  const { data: profile, isLoading, isError } = useProfile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Loading State
@@ -22,7 +22,7 @@ export const DashboardLayout = () => {
     );
   }
 
-  // Error State (e.g., if user was deleted or network fail)
+  // Error State
   if (isError) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -31,12 +31,19 @@ export const DashboardLayout = () => {
     );
   }
 
+  // --- DISTINCT THEME FOR PASTOR-IN-CHARGE (UNIT PASTOR) ---
+  const isUnitPastor = profile?.role === 'unit_pastor';
+
+  // Apply a distinct background tint for Unit Pastors
+  const themeClasses = isUnitPastor
+    ? "bg-indigo-50/50" // Subtle Purple/Indigo tint
+    : "bg-slate-50/50"; // Default Slate
+
   return (
-    <div className="relative min-h-screen bg-slate-50/50">
+    <div className={`relative min-h-screen ${themeClasses}`}>
       <Background />
 
       {/* Sidebar (Desktop) */}
-      {/* Note: If your Sidebar supports mobile props, pass isMobileMenuOpen here */}
       <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block fixed inset-y-0 left-0 z-40 md:relative`}>
          <Sidebar />
       </div>
@@ -47,12 +54,20 @@ export const DashboardLayout = () => {
         {/* --- GLOBAL HEADER --- */}
         <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
+        {/* --- UNIT PASTOR BANNER --- */}
+        {isUnitPastor && (
+          <div className="bg-indigo-600 text-white px-6 py-2 shadow-md flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider relative z-10">
+            <ShieldCheck className="h-4 w-4" />
+            <span>Pastor-in-Charge View (Approval Mode)</span>
+          </div>
+        )}
+
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
           <Outlet />
         </div>
       </main>
 
-      {/* Mobile Overlay (Closes menu when clicking outside) */}
+      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"

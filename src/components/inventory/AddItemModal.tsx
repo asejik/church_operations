@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 interface AddItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Renamed for clarity (was onItemAdded)
-  itemToEdit?: any;      // New Prop: The item being edited
+  onSuccess: () => void; // Standardized name
+  itemToEdit?: any;      // New prop for editing
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onSuccess, itemToEdit }) => {
@@ -66,7 +66,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
             date_purchased: formData.date_purchased,
             notes: formData.notes
           })
-          .eq('id', itemToEdit.id); // Target specific item
+          .eq('id', itemToEdit.id);
 
         if (error) throw error;
         toast.success("Item updated successfully");

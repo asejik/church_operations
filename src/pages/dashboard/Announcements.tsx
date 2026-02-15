@@ -18,8 +18,13 @@ export const AnnouncementsPage = () => {
 
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
-  // Role check
-  const isSMR = profile?.role === 'smr' || profile?.role === 'admin_pastor';
+  // ROLE LOGIC
+  const isSMR = profile?.role === 'smr';
+  const isAdmin = profile?.role === 'admin_pastor';
+  const isExecutive = isSMR || isAdmin; // Can view read status differently (e.g. no blue dot)
+
+  // STRICT PERMISSION: Only SMR can create/delete. Admin is viewer only.
+  const canCreate = isSMR;
 
   const fetchData = async () => {
     if (!profile) return;
@@ -62,8 +67,8 @@ export const AnnouncementsPage = () => {
   const handleView = (announcement: any) => {
     setSelectedAnnouncement(announcement);
 
-    // If regular user (not SMR) and hasn't read it yet, mark as read
-    if (!isSMR && !readIds.has(announcement.id)) {
+    // If regular user (not Executive) and hasn't read it yet, mark as read
+    if (!isExecutive && !readIds.has(announcement.id)) {
       markAsRead(announcement.id);
     }
   };
@@ -105,7 +110,9 @@ export const AnnouncementsPage = () => {
           <h1 className="text-2xl font-bold text-slate-900">Announcements</h1>
           <p className="text-slate-500">Official updates from Leadership</p>
         </div>
-        {isSMR && (
+
+        {/* ONLY SMR (canCreate) SEES THIS BUTTON */}
+        {canCreate && (
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> New Announcement
           </Button>
@@ -121,7 +128,7 @@ export const AnnouncementsPage = () => {
           </div>
         ) : (
           announcements.map((ann) => {
-            const isRead = readIds.has(ann.id) || isSMR; // SMR always sees as "read" visually (no blue dot)
+            const isRead = readIds.has(ann.id) || isExecutive;
             const isUrgent = ann.priority === 'urgent';
 
             return (
@@ -198,7 +205,7 @@ export const AnnouncementsPage = () => {
                   </div>
 
                   {/* Only show 'Read' status to regular users */}
-                  {!isSMR && (
+                  {!isExecutive && (
                     <span className="flex items-center gap-1 text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">
                       <CheckCheck className="h-3 w-3" /> Marked as Read
                     </span>
@@ -211,7 +218,8 @@ export const AnnouncementsPage = () => {
             </div>
 
             <div className="pt-6 border-t border-slate-100 flex justify-end gap-3">
-               {isSMR && (
+               {/* ONLY SMR CAN DELETE */}
+               {canCreate && (
                  <Button
                    variant="ghost"
                    className="text-red-500 hover:text-red-700 hover:bg-red-50"

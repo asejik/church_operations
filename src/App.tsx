@@ -30,7 +30,6 @@ import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
 import { SMRLayout } from "@/components/layout/SMRLayout";
 import { SMRDashboard } from "@/pages/smr/SMRDashboard";
 import { SMRReports } from "@/pages/smr/SMRReports";
-import { Debug } from "@/pages/smr/Debug";
 
 // Simple Landing Page Component
 const LandingPage = () => {
@@ -93,6 +92,8 @@ function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="inventory" element={<InventoryPage />} />
+            {/* Added Announcements Route */}
+            <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
 
           {/* EVANGELISM OVERSIGHT ROUTES */}
@@ -115,7 +116,6 @@ function App() {
             <Route path="performance" element={<PerformancePage />} />
             <Route path="members" element={<MembersPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
-            <Route path="debug" element={<Debug />} />
 
           </Route>
 

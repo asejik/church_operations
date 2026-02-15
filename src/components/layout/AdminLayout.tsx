@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
+import { NotificationBell } from './NotificationBell'; // <--- Added
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { toast } from 'sonner';
 import {
   LayoutDashboard,
   Wallet,
@@ -9,15 +13,101 @@ import {
   LogOut,
   Menu,
   X,
-  CircleUser,
-  ArrowRight
+  Megaphone, // <--- Added for Announcements
+  Settings,  // <--- Added for Profile Edit
+  Lock,
+  User
 } from 'lucide-react';
 
+// --- SUB-COMPONENT: ADMIN PROFILE MODAL ---
+const AdminProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boolean; onClose: () => void; profile: any; onUpdate: () => void }) => {
+  const [loading, setLoading] = useState(false);
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+
+  const handleUpdateName = async () => {
+    if (!profile?.id) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ full_name: fullName }).eq('id', profile.id);
+      if (error) throw error;
+      toast.success("Name updated successfully");
+      onUpdate();
+    } catch (err: any) {
+      toast.error("Failed to update name");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (passwords.new.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwords.new });
+      if (error) throw error;
+      toast.success("Password updated successfully");
+      setPasswords({ new: '', confirm: '' });
+    } catch (err: any) {
+      toast.error("Failed to update password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Admin Account Settings">
+      <div className="space-y-8">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+            <User className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase">Personal Details</h3>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+            <input className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Pastor Queen Okoye" />
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleUpdateName} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">Save Name</Button>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+            <Lock className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase">Security</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">New Password</label>
+              <input type="password" className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={passwords.new} onChange={e => setPasswords({ ...passwords, new: e.target.value })} placeholder="••••••" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase">Confirm Password</label>
+              <input type="password" className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-amber-500" value={passwords.confirm} onChange={e => setPasswords({ ...passwords, confirm: e.target.value })} placeholder="••••••" />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleUpdatePassword} isLoading={loading} className="bg-slate-900 hover:bg-slate-800">Update Password</Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 export const AdminLayout = () => {
-  const { data: profile } = useProfile();
+  const { data: profile, refetch } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -26,9 +116,13 @@ export const AdminLayout = () => {
 
   const navItems = [
     { label: 'Overview', path: '/admin', icon: LayoutDashboard },
+    { label: 'Announcements', path: '/admin/announcements', icon: Megaphone }, // <--- Added
     { label: 'Global Finances', path: '/admin/finance', icon: Wallet },
     { label: 'Global Inventory', path: '/admin/inventory', icon: Package },
   ];
+
+  // Helper to get current page title
+  const currentNav = navItems.find(item => location.pathname === item.path) || navItems[0];
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -38,7 +132,6 @@ export const AdminLayout = () => {
           <h1 className="text-xl font-bold bg-gradient-to-r from-amber-200 to-yellow-500 bg-clip-text text-transparent">
             Admin Portal
           </h1>
-          {/* REMOVED: SMR Command Center text */}
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -60,9 +153,6 @@ export const AdminLayout = () => {
               </Link>
             );
           })}
-
-          {/* LINK TO UNIT DASHBOARD */}
-          {/* Note: Kept commented out or removed based on previous step, but ensuring code cleanliness */}
         </nav>
 
         {/* User Profile Snippet */}
@@ -72,9 +162,17 @@ export const AdminLayout = () => {
               {profile?.full_name?.[0] || 'A'}
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-white truncate">{profile?.full_name}</p>
+              <p className="text-sm font-medium text-white truncate" title={profile?.full_name}>{profile?.full_name}</p>
               <p className="text-xs text-amber-500 truncate">Admin Pastor</p>
             </div>
+            {/* Edit Profile Button */}
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition-colors"
+              title="Account Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
           </div>
           <button
             onClick={handleLogout}
@@ -87,10 +185,14 @@ export const AdminLayout = () => {
 
       {/* MOBILE HEADER */}
       <div className="md:hidden fixed top-0 w-full bg-slate-900 text-white z-30 px-4 py-3 flex justify-between items-center shadow-md">
-        <span className="font-bold text-amber-500">Admin Portal</span>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-3">
+           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+             {isMobileMenuOpen ? <X /> : <Menu />}
+           </button>
+           <span className="font-bold text-amber-500">Admin Portal</span>
+        </div>
+        {/* Mobile Notification Bell */}
+        <NotificationBell />
       </div>
 
       {/* MOBILE MENU */}
@@ -107,16 +209,57 @@ export const AdminLayout = () => {
                 {item.label}
               </Link>
           ))}
-          <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-4 w-full text-red-400">
-            <LogOut className="h-5 w-5" /> Sign Out
-          </button>
+          <div className="border-t border-slate-800 pt-4 mt-4">
+             <div className="flex items-center gap-3 px-4 mb-4" onClick={() => { setIsProfileModalOpen(true); setIsMobileMenuOpen(false); }}>
+                <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
+                  {profile?.full_name?.[0] || 'A'}
+                </div>
+                <div>
+                  <p className="text-white font-bold">{profile?.full_name}</p>
+                  <p className="text-xs text-amber-400">Tap to edit profile</p>
+                </div>
+             </div>
+             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-4 w-full text-red-400">
+               <LogOut className="h-5 w-5" /> Sign Out
+             </button>
+          </div>
         </div>
       )}
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 max-w-7xl mx-auto w-full">
-        <Outlet />
+      <main className="flex-1 md:ml-64 flex flex-col min-h-screen transition-all">
+
+        {/* --- DESKTOP HEADER (For Notifications & Breadcrumbs) --- */}
+        <header className="sticky top-0 z-10 hidden md:flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md">
+           <div className="flex items-center gap-2 text-slate-500">
+              <Link to="/admin" className="hover:text-amber-600 transition-colors">Portal</Link>
+              <span className="text-slate-300">/</span>
+              <span className="font-bold text-slate-800">{currentNav.label}</span>
+           </div>
+
+           <div className="flex items-center gap-4">
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 uppercase tracking-wide">
+                Admin Access
+              </span>
+              <div className="h-6 w-px bg-slate-200"></div>
+              {/* Desktop Notification Bell */}
+              <NotificationBell />
+           </div>
+        </header>
+
+        {/* Page Content */}
+        <div className="p-4 md:p-8 pt-20 md:pt-8 w-full max-w-7xl mx-auto flex-1">
+           <Outlet />
+        </div>
       </main>
+
+      {/* Profile Modal */}
+      <AdminProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        profile={profile}
+        onUpdate={refetch}
+      />
     </div>
   );
 };

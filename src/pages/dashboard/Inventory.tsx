@@ -9,13 +9,19 @@ import { AddItemModal } from '@/components/inventory/AddItemModal';
 export const InventoryPage = () => {
   const { data: profile, isLoading: profileLoading } = useProfile();
 
+  // ROLE LOGIC
+  // Admins/SMR have Global View access
   const isAdmin = profile?.role === 'admin_pastor' || profile?.role === 'smr';
-  // Allow editing if you are NOT an admin (Unit Head) or if you are an Admin (Global Edit)
-  // Adjust this logic if you want to restrict Admins from editing unit items directly
-  const canEdit = !isAdmin || isAdmin;
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null); // State for item being edited
+  // Unit Heads have Local CRUD access
+  const isUnitHead = profile?.role === 'unit_head';
+
+  // STRICT PERMISSION: Only Unit Heads can Add/Edit.
+  // Admins & SMR are strictly View-Only for Unit Inventory.
+  const canEdit = isUnitHead;
+
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
@@ -30,6 +36,7 @@ export const InventoryPage = () => {
     try {
       let query = supabase.from('inventory').select('*, units(name)');
 
+      // Admins see all units (or filtered unit), Unit Heads see own unit
       if (!isAdmin) {
         query = query.eq('unit_id', profile.unit_id);
       }
@@ -38,6 +45,7 @@ export const InventoryPage = () => {
       if (error) throw error;
       setItems(data || []);
 
+      // If Admin, fetch unit list for filter dropdown
       if (isAdmin) {
         const { data: unitsData } = await supabase.from('units').select('id, name').order('name');
         setUnits(unitsData || []);
@@ -57,12 +65,12 @@ export const InventoryPage = () => {
 
   const handleEdit = (item: any) => {
     setEditingItem(item);
-    setIsModalOpen(true);
+    setIsAddOpen(true);
   };
 
   const handleAddNew = () => {
     setEditingItem(null);
-    setIsModalOpen(true);
+    setIsAddOpen(true);
   };
 
   const getConditionBadge = (c: string) => {
@@ -91,6 +99,8 @@ export const InventoryPage = () => {
         (item.units?.name?.toLowerCase() || '').includes(searchQuery.toLowerCase());
 
       if (!matchesSearch) return false;
+
+      // Admin Unit Filter
       if (isAdmin && selectedUnit !== 'all' && item.unit_id !== selectedUnit) return false;
 
       return true;
@@ -158,7 +168,8 @@ export const InventoryPage = () => {
               </Button>
             )}
 
-            {!isAdmin && profile?.role !== 'unit_pastor' && (
+            {/* ONLY UNIT HEADS CAN ADD */}
+            {canEdit && (
               <Button size="sm" className="h-10" onClick={handleAddNew}>
                 <Plus className="mr-2 h-4 w-4" /> Add Item
               </Button>
@@ -181,14 +192,14 @@ export const InventoryPage = () => {
                   <th className="px-4 py-4 border-r border-slate-100">Condition</th>
                   <th className="px-4 py-4 border-r border-slate-100 text-center">Qty</th>
                   <th className="px-4 py-4">Notes</th>
-                  {/* EDIT ACTION COLUMN */}
+                  {/* EDIT COLUMN: Only visible if editing is allowed */}
                   {canEdit && <th className="px-4 py-4 w-12 text-center"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredItems.length === 0 ? (
                    <tr>
-                     <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
+                     <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-slate-500">
                        <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
                        No items found matching filters.
                      </td>
@@ -223,7 +234,7 @@ export const InventoryPage = () => {
                         {item.notes || "—"}
                       </td>
 
-                      {/* EDIT BUTTON */}
+                      {/* EDIT BUTTON (Only for Unit Heads) */}
                       {canEdit && (
                         <td className="px-4 py-3 text-center">
                           <button
@@ -245,10 +256,10 @@ export const InventoryPage = () => {
       </div>
 
       <AddItemModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchInventory} // Renamed prop usage
-        itemToEdit={editingItem}   // Pass selected item
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onSuccess={fetchInventory}
+        itemToEdit={editingItem}
       />
     </div>
   );
