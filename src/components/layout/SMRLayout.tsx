@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { NotificationBell } from './NotificationBell';
+import { SMRBottomNav } from './SMRBottomNav';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
@@ -147,10 +148,11 @@ export const SMRLayout = () => {
   const currentNav = navItems.find(item => location.pathname === item.path) || navItems[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* SIDEBAR (Desktop) */}
-      <aside className="hidden md:flex w-64 flex-col bg-slate-900 text-white fixed h-full shadow-xl z-20">
-        <div className="p-6 border-b border-slate-800">
+    <div className="flex h-screen w-full overflow-hidden bg-slate-50">
+
+      {/* --- DESKTOP SIDEBAR --- */}
+      <aside className="hidden md:flex w-64 flex-col bg-slate-900 text-white fixed h-full shadow-xl z-50">
+        <div className="p-6 border-b border-slate-800 shrink-0">
           <h1 className="text-xl font-bold bg-gradient-to-r from-amber-200 to-yellow-500 bg-clip-text text-transparent">
             SMR Portal
           </h1>
@@ -178,7 +180,7 @@ export const SMRLayout = () => {
         </nav>
 
         {/* User Profile Snippet */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/50 shrink-0">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
               {profile?.full_name?.[0] || 'S'}
@@ -194,55 +196,80 @@ export const SMRLayout = () => {
         </div>
       </aside>
 
-      {/* MOBILE HEADER */}
-      <div className="md:hidden fixed top-0 w-full bg-slate-900 text-white z-30 px-4 py-3 flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-3">
-           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-             {isMobileMenuOpen ? <X /> : <Menu />}
-           </button>
-           <span className="font-bold text-amber-500">SMR Portal</span>
-        </div>
-        <NotificationBell />
-      </div>
-
-      {/* MOBILE MENU */}
+      {/* --- MOBILE SIDEBAR DRAWER --- */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-slate-900 z-20 pt-16 px-4 space-y-2 md:hidden overflow-y-auto">
-          {navItems.map((item) => (
-             <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800 text-white"
-              >
-                <item.icon className="h-5 w-5 text-amber-500" />
-                {item.label}
-              </Link>
-          ))}
-          <div className="border-t border-slate-800 pt-4 mt-4 pb-8">
-             <div className="flex items-center gap-3 px-4 mb-4" onClick={() => { setIsProfileModalOpen(true); setIsMobileMenuOpen(false); }}>
-                <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
-                  {profile?.full_name?.[0] || 'S'}
-                </div>
-                <div>
-                  <p className="text-white font-bold">{profile?.full_name}</p>
-                  <p className="text-xs text-amber-400">Tap to edit profile</p>
-                </div>
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          <div className="relative flex w-72 flex-1 flex-col bg-slate-900 text-white shadow-2xl animate-in slide-in-from-left duration-200">
+             <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0">
+                <h1 className="text-lg font-bold text-amber-500">Menu</h1>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400 hover:text-white">
+                  <X className="h-5 w-5" />
+                </button>
              </div>
-             <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-4 w-full text-red-400">
-               <LogOut className="h-5 w-5" /> Sign Out
-             </button>
+
+             <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+               {navItems.map((item) => {
+                 const isActive = location.pathname === item.path;
+                 return (
+                    <Link
+                       key={item.path}
+                       to={item.path}
+                       onClick={() => setIsMobileMenuOpen(false)}
+                       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                         isActive ? 'bg-amber-600 text-white' : 'text-slate-400 hover:bg-slate-800'
+                       }`}
+                     >
+                       <item.icon className={`h-5 w-5 ${isActive ? 'text-white' : 'text-amber-500/70'}`} />
+                       {item.label}
+                     </Link>
+                 )
+               })}
+             </nav>
+
+             <div className="p-4 border-t border-slate-800 bg-slate-950/50 shrink-0">
+                <div className="flex items-center gap-3 mb-4" onClick={() => { setIsProfileModalOpen(true); setIsMobileMenuOpen(false); }}>
+                   <div className="h-10 w-10 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold shrink-0">
+                     {profile?.full_name?.[0] || 'S'}
+                   </div>
+                   <div className="overflow-hidden">
+                     <p className="text-sm font-bold text-white truncate">{profile?.full_name}</p>
+                     <p className="text-xs text-amber-400">Tap to edit profile</p>
+                   </div>
+                </div>
+                <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 w-full px-2">
+                  <LogOut className="h-4 w-4" /> Sign Out
+                </button>
+             </div>
           </div>
         </div>
       )}
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 md:ml-64 flex flex-col min-h-screen transition-all">
+      {/* --- MAIN CONTENT AREA --- */}
+      <main className="flex-1 flex flex-col md:ml-64 relative h-full overflow-y-auto overflow-x-hidden">
 
-        {/* --- DESKTOP HEADER --- */}
-        <header className="sticky top-0 z-10 hidden md:flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md">
+        {/* --- BRANDED MOBILE HEADER (Sticky) --- */}
+        <div className="md:hidden sticky top-0 z-30 w-full bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm">
+          <div className="flex items-center gap-3">
+             <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-600 hover:text-slate-900 transition-colors">
+               <Menu className="h-6 w-6" />
+             </button>
+             <div className="flex flex-col">
+               <span className="text-[9px] font-bold text-amber-600 uppercase tracking-wider leading-tight">SMR Portal</span>
+               <span className="font-bold text-slate-900 text-sm leading-tight">Citizens of Light Church</span>
+             </div>
+          </div>
+          <NotificationBell />
+        </div>
+
+        {/* --- DESKTOP HEADER (Sticky) --- */}
+        <header className="hidden md:flex sticky top-0 z-10 h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md">
            <div className="flex items-center gap-2 text-slate-500">
-              <Link to="/smr" className="hover:text-amber-600 transition-colors">Portal</Link>
+              <span className="text-slate-400">Portal</span>
               <span className="text-slate-300">/</span>
               <span className="font-bold text-slate-800">{currentNav.label}</span>
            </div>
@@ -295,9 +322,13 @@ export const SMRLayout = () => {
         </header>
 
         {/* Page Content */}
-        <div className="p-4 md:p-8 pt-20 md:pt-8 w-full max-w-7xl mx-auto flex-1">
+        <div className="flex-1 p-4 md:p-8 pb-24 md:pb-8 w-full max-w-7xl mx-auto">
            <Outlet />
         </div>
+
+        {/* --- MOBILE BOTTOM NAV --- */}
+        <SMRBottomNav onMenuClick={() => setIsMobileMenuOpen(true)} />
+
       </main>
 
       <SMRProfileModal

@@ -115,11 +115,17 @@ export const InventoryPage = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{isAdmin ? 'Global Inventory' : 'Inventory'}</h1>
           <p className="text-slate-500">{isAdmin ? 'View equipment across all units' : 'Manage unit equipment'}</p>
         </div>
+        {/* ONLY UNIT HEADS CAN ADD */}
+        {canEdit && (
+          <Button onClick={handleAddNew} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> Add Item
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
@@ -134,7 +140,7 @@ export const InventoryPage = () => {
             />
          </div>
 
-         <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
+         <div className="flex gap-2 w-full md:w-auto overflow-x-auto items-center pb-1 sm:pb-0">
             {isAdmin && (
               <select
                 className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[140px]"
@@ -149,7 +155,7 @@ export const InventoryPage = () => {
             )}
 
             <select
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500"
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 min-w-[120px]"
                 value={sortOrder}
                 onChange={e => setSortOrder(e.target.value as 'newest' | 'oldest')}
               >
@@ -161,23 +167,69 @@ export const InventoryPage = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 px-3 text-slate-500 hover:text-red-500"
+                className="h-10 px-2 text-slate-500 hover:text-red-500"
                 onClick={() => { setSelectedUnit('all'); setSortOrder('newest'); setSearchQuery(''); }}
               >
-                <X className="h-4 w-4 mr-1" /> Clear
-              </Button>
-            )}
-
-            {/* ONLY UNIT HEADS CAN ADD */}
-            {canEdit && (
-              <Button size="sm" className="h-10" onClick={handleAddNew}>
-                <Plus className="mr-2 h-4 w-4" /> Add Item
+                <X className="h-4 w-4" />
               </Button>
             )}
          </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* --- MOBILE: CARD LIST (< md) --- */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+           <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+        ) : filteredItems.length === 0 ? (
+           <div className="p-8 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+             <Package className="mx-auto h-10 w-10 text-slate-300 mb-2" />
+             <p className="text-sm">No items found.</p>
+           </div>
+        ) : (
+          filteredItems.map((item) => (
+            <div key={item.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3">
+               {/* Top: Name & Qty */}
+               <div className="flex justify-between items-start">
+                  <div>
+                     <h3 className="font-bold text-slate-900 leading-tight">{item.item_name}</h3>
+                     {isAdmin && <p className="text-[10px] text-slate-500 uppercase mt-0.5 font-medium tracking-wide">{item.units?.name}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-700 shrink-0">
+                    <span className="text-[10px] text-slate-400 font-normal">QTY:</span> {item.quantity}
+                  </div>
+               </div>
+
+               {/* Middle: Condition & Date */}
+               <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wide ${getConditionBadge(item.condition)}`}>
+                    {getConditionIcon(item.condition)}
+                    {item.condition}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Purchased: {formatDate(item.date_purchased)}
+                  </span>
+               </div>
+
+               {/* Bottom: Notes & Edit */}
+               {(item.notes || canEdit) && (
+                 <div className="flex items-end justify-between gap-4 pt-3 mt-1 border-t border-slate-50">
+                   <p className="text-xs text-slate-500 italic line-clamp-2 flex-1">
+                     {item.notes ? `"${item.notes}"` : "No notes."}
+                   </p>
+                   {canEdit && (
+                     <Button size="sm" variant="outline" className="h-7 px-3 text-xs shrink-0" onClick={() => handleEdit(item)}>
+                       <Pencil className="h-3 w-3 mr-1" /> Edit
+                     </Button>
+                   )}
+                 </div>
+               )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* --- DESKTOP: TABLE (>= md) --- */}
+      <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           {loading ? (
              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
@@ -222,7 +274,7 @@ export const InventoryPage = () => {
                         {formatDate(item.date_purchased)}
                       </td>
                       <td className="px-4 py-3 border-r border-slate-100">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border capitalize ${getConditionBadge(item.condition)}`}>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wide ${getConditionBadge(item.condition)}`}>
                           {getConditionIcon(item.condition)}
                           {item.condition}
                         </span>
@@ -237,13 +289,15 @@ export const InventoryPage = () => {
                       {/* EDIT BUTTON (Only for Unit Heads) */}
                       {canEdit && (
                         <td className="px-4 py-3 text-center">
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => handleEdit(item)}
-                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                            className="text-slate-400 hover:text-blue-600 h-8 px-2"
                             title="Edit Item"
                           >
                             <Pencil className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </td>
                       )}
                     </tr>

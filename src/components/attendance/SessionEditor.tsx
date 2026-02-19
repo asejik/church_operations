@@ -109,7 +109,7 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
       // 3. Update Dexie (Local Cache)
       if (existingSessionId) {
         const oldLogs = await db.attendanceLogs.where('event_id').equals(existingSessionId).toArray();
-        // @ts-ignore - Dexie types can be strict about undefined IDs, but bulkDelete handles arrays of keys
+        // @ts-ignore
         await db.attendanceLogs.bulkDelete(oldLogs.map(l => l.id));
       }
 
@@ -133,8 +133,8 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={existingSessionId ? "Edit Session" : "New Attendance Session"}>
       <div className="space-y-4 max-h-[80vh] flex flex-col">
-        {/* Header Stats */}
-        <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4 border border-slate-100">
+        {/* Header Stats - Mobile Responsive */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-slate-50 p-4 border border-slate-100">
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase">Session Date</label>
             <div className="flex items-center gap-2 mt-1">
@@ -143,18 +143,18 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
                 type="date"
                 value={sessionDate}
                 onChange={(e) => setSessionDate(e.target.value)}
-                className="bg-transparent font-bold text-slate-900 outline-none"
+                className="bg-transparent font-bold text-slate-900 outline-none w-full"
               />
             </div>
           </div>
-          <div className="flex gap-4 text-sm">
-            <div className="text-center">
-              <span className="block font-bold text-green-600">{presentCount}</span>
-              <span className="text-xs text-slate-500">Present</span>
+          <div className="flex gap-4 text-sm justify-start sm:justify-end border-t sm:border-t-0 border-slate-200 pt-3 sm:pt-0">
+            <div className="text-center bg-green-50 px-3 py-1 rounded-lg border border-green-100">
+              <span className="block font-bold text-green-700">{presentCount}</span>
+              <span className="text-[10px] uppercase font-bold text-green-600">Present</span>
             </div>
-            <div className="text-center">
-              <span className="block font-bold text-red-600">{absentCount}</span>
-              <span className="text-xs text-slate-500">Absent</span>
+            <div className="text-center bg-red-50 px-3 py-1 rounded-lg border border-red-100">
+              <span className="block font-bold text-red-700">{absentCount}</span>
+              <span className="text-[10px] uppercase font-bold text-red-600">Absent</span>
             </div>
           </div>
         </div>
@@ -179,13 +179,13 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
                 </button>
 
                 <div className="flex-1 pt-1">
-                  <p className={`font-medium ${isPresent ? 'text-slate-900' : 'text-red-900'}`}>{member.full_name}</p>
+                  <p className={`font-medium text-sm sm:text-base ${isPresent ? 'text-slate-900' : 'text-red-900'}`}>{member.full_name}</p>
 
                   {!isPresent && (
                     <input
                       type="text"
                       placeholder="Reason (e.g. Sick, Traveled)"
-                      className="mt-2 w-full rounded border border-red-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-red-400 placeholder:text-red-200"
+                      className="mt-2 w-full rounded border border-red-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-red-400 placeholder:text-red-300 shadow-sm"
                       value={state.reason}
                       onChange={(e) => updateReason(member.id, e.target.value)}
                     />
@@ -198,8 +198,8 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
 
         {/* Footer Actions */}
         <div className="pt-2 border-t border-slate-100 flex justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} isLoading={loading}>
+          <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleSave} isLoading={loading} className="w-full sm:w-auto">
             <Save className="mr-2 h-4 w-4" />
             Save Session
           </Button>

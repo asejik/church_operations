@@ -147,11 +147,11 @@ export const PerformancePage = () => {
         }`}
         title={hasComment ? "Click to view note" : ""}
       >
-        <span className={`text-[10px] font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>
+        <span className={`text-[10px] sm:text-xs font-bold ${score >= 4 ? 'text-green-600' : score >= 3 ? 'text-blue-600' : 'text-red-500'}`}>
           {score || '-'}
         </span>
         <div className="flex items-center gap-0.5">
-          <span className="text-[7px] text-slate-400 uppercase tracking-tighter">{label}</span>
+          <span className="text-[7px] sm:text-[8px] text-slate-400 uppercase tracking-tighter">{label}</span>
           {hasComment && <div className="h-1 w-1 rounded-full bg-blue-400" />}
         </div>
       </div>
@@ -188,7 +188,9 @@ export const PerformancePage = () => {
         </div>
 
         {isEditor && (
-          <Button onClick={handleAddNew}><Plus className="mr-2 h-4 w-4" /> New Review</Button>
+          <Button onClick={handleAddNew} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> New Review
+          </Button>
         )}
       </div>
 
@@ -206,7 +208,71 @@ export const PerformancePage = () => {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* --- MOBILE: CARD LIST (< md) --- */}
+      <div className="md:hidden space-y-4">
+         {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+         ) : currentReviews.length === 0 ? (
+            <div className="text-center py-12 text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <MessageSquare className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm">No reviews found.</p>
+            </div>
+         ) : (
+           currentReviews.map((review) => (
+             <div key={review.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-3">
+
+               {/* Header: Name & Average */}
+               <div className="flex justify-between items-start">
+                 <div className="flex gap-2">
+                   <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                     <User className="h-4 w-4" />
+                   </div>
+                   <div>
+                     <h3 className="font-bold text-slate-900 leading-tight">{review.member_name}</h3>
+                     <span className="text-[10px] text-slate-500">{new Date(review.review_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                   </div>
+                 </div>
+                 <div className="flex flex-col items-end">
+                   <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 font-bold text-xs">
+                     <span>{review.average_score}</span>
+                     <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                   </div>
+                   <span className="text-[9px] uppercase font-bold text-slate-400 mt-1">Average</span>
+                 </div>
+               </div>
+
+               {/* General Comment */}
+               {review.comment && (
+                 <p className="text-xs text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                   "{review.comment}"
+                 </p>
+               )}
+
+               {/* Score Breakdown Row */}
+               <div className="flex justify-between pt-2 border-t border-slate-50 mt-1">
+                 <ScoreBadge label="Punc" score={review.rating_punctuality} comment={review.comment_punctuality} />
+                 <ScoreBadge label="Comm" score={review.rating_communication} comment={review.comment_communication} />
+                 <ScoreBadge label="Svc" score={review.rating_commitment} comment={review.comment_commitment} />
+                 <ScoreBadge label="Team" score={review.rating_teamwork} comment={review.comment_teamwork} />
+                 <ScoreBadge label="Resp" score={review.rating_responsibility} comment={review.comment_responsibility} />
+                 <ScoreBadge label="Spirit" score={review.rating_spiritual} comment={review.comment_spiritual} />
+               </div>
+
+               {/* Edit Button */}
+               {isEditor && (
+                 <div className="pt-2 border-t border-slate-50 mt-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => handleEdit(review)}>
+                      <Pencil className="h-3 w-3 mr-2" /> Edit Review
+                    </Button>
+                 </div>
+               )}
+             </div>
+           ))
+         )}
+      </div>
+
+      {/* --- DESKTOP: TABLE (>= md) --- */}
+      <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           {loading ? (
              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
@@ -295,7 +361,7 @@ export const PerformancePage = () => {
         onReviewSubmitted={fetchData}
         members={members}
         unitId={selectedUnitId}
-        initialData={editingReview} // <--- Pass review data for editing
+        initialData={editingReview}
       />
     </div>
   );

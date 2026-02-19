@@ -75,80 +75,80 @@ export const SMRReports = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-20 print:p-0 print:pb-0 print:max-w-none">
+    <div className="space-y-6 md:space-y-8 max-w-5xl mx-auto pb-24 md:pb-8 print:p-0 print:pb-0 print:max-w-none">
 
       {/* HEADER (Hidden when printing) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Statistical Reports</h1>
-          <p className="text-slate-500">Generate printable monthly summaries</p>
+          <h1 className="text-xl md:text-3xl font-bold text-slate-900">Statistical Reports</h1>
+          <p className="text-xs md:text-sm text-slate-500 mt-0.5">Generate printable monthly summaries</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
           <input
             type="month"
-            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
+            className="flex-1 sm:flex-none h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:border-amber-500"
             value={reportDate}
             onChange={(e) => setReportDate(e.target.value)}
           />
-          <Button onClick={handlePrint} variant="outline">
-            <Printer className="mr-2 h-4 w-4" /> Print PDF
+          <Button onClick={handlePrint} variant="outline" className="h-10 shrink-0">
+            <Printer className="mr-2 h-4 w-4" /> Print
           </Button>
         </div>
       </div>
 
       {/* --- REPORT PAPER --- */}
-      <div className="bg-white p-8 sm:p-12 shadow-sm border border-slate-200 print:border-none print:shadow-none min-h-[800px]">
+      <div className="bg-white p-5 sm:p-8 md:p-12 shadow-sm border border-slate-200 rounded-xl print:border-none print:shadow-none print:p-0 min-h-[600px] md:min-h-[800px]">
 
         {/* Report Letterhead */}
-        <div className="border-b-2 border-slate-900 pb-6 mb-8 flex justify-between items-end">
+        <div className="border-b-2 border-slate-900 pb-4 md:pb-6 mb-6 md:mb-8 flex justify-between items-end">
           <div>
-            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tight">SMR</h1>
-            <p className="text-slate-500 font-medium">Statistical Management Report</p>
+            <h1 className="text-2xl md:text-4xl font-black text-slate-900 uppercase tracking-tight">SMR</h1>
+            <p className="text-[10px] md:text-sm text-slate-500 font-medium">Statistical Management Report</p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold text-slate-900">Citizens of Light Church</p>
-            <p className="text-slate-500 text-sm">Ilorin Operations</p>
-            <p className="text-2xl font-bold text-amber-600 mt-2">
+            <p className="text-[10px] md:text-sm font-bold text-slate-900">Citizens of Light Church</p>
+            <p className="text-slate-500 text-[9px] md:text-sm">Ilorin Operations</p>
+            <p className="text-lg md:text-2xl font-bold text-amber-600 mt-1 md:mt-2">
               {new Date(reportDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </p>
           </div>
         </div>
 
         {loading ? (
-           <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-slate-300" /></div>
+           <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-8 md:space-y-12">
 
             {/* 1. EXECUTIVE SUMMARY GRID */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-3 md:gap-6">
                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center print:border-slate-300">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Attendance</p>
-                  <p className="text-3xl font-black text-slate-900">{data.summary.attendanceGrowth}</p>
+                  <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Avg Attendance</p>
+                  <p className="text-2xl md:text-3xl font-black text-slate-900">{data.summary.attendanceGrowth}</p>
                </div>
                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center print:border-slate-300">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Souls Won</p>
-                  <p className="text-3xl font-black text-pink-600">{data.summary.soulsTotal}</p>
+                  <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Souls Won</p>
+                  <p className="text-2xl md:text-3xl font-black text-pink-600">{data.summary.soulsTotal}</p>
                </div>
             </div>
 
             {/* 2. ATTENDANCE ANALYSIS */}
             <div>
-               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                 <TrendingUp className="h-5 w-5 text-blue-600" /> Attendance Trends
+               <h3 className="text-sm md:text-lg font-bold text-slate-900 mb-3 md:mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                 <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-blue-600" /> Attendance Trends
                </h3>
                {data.attendance.length === 0 ? (
-                 <p className="text-slate-400 italic">No attendance data recorded for this month.</p>
+                 <p className="text-xs md:text-sm text-slate-400 italic">No attendance data recorded for this month.</p>
                ) : (
-                 <div className="h-40 flex items-end gap-2 mt-6 pb-2 border-b border-slate-200">
+                 <div className="h-32 md:h-40 flex items-end gap-1.5 md:gap-2 mt-4 md:mt-6 pb-2 border-b border-slate-200 overflow-x-auto custom-scrollbar">
                     {data.attendance.slice(0, 15).map((record, i) => {
                        const height = Math.min((record.total / 100) * 100, 100);
                        return (
-                         <div key={i} className="flex-1 flex flex-col justify-end group relative">
+                         <div key={i} className="flex-1 min-w-[16px] md:min-w-[24px] flex flex-col justify-end group relative">
                            <div
                              className="w-full bg-blue-500 rounded-t-sm print:bg-slate-800"
                              style={{ height: `${height}%` }}
                            ></div>
-                           <div className="text-[10px] text-center text-slate-400 mt-1 truncate">
+                           <div className="text-[8px] md:text-[10px] text-center text-slate-400 mt-1 truncate">
                              {new Date(record.service_date).getDate()}
                            </div>
                          </div>
@@ -160,17 +160,17 @@ export const SMRReports = () => {
 
             {/* 3. SOULS ACQUISITION */}
             <div>
-               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
-                 <TrendingUp className="h-5 w-5 text-pink-600" /> Kingdom Expansion
+               <h3 className="text-sm md:text-lg font-bold text-slate-900 mb-3 md:mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
+                 <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-pink-600" /> Kingdom Expansion
                </h3>
-               <div className="bg-pink-50 rounded-xl p-6 border border-pink-100 flex items-center justify-between print:border-slate-200 print:bg-slate-50">
+               <div className="bg-pink-50 rounded-xl p-4 md:p-6 border border-pink-100 flex items-center justify-between print:border-slate-200 print:bg-slate-50">
                   <div>
-                    <p className="text-sm text-pink-800 print:text-slate-600">Total Souls Won</p>
-                    <p className="text-3xl font-black text-pink-600 print:text-slate-900">{data.summary.soulsTotal}</p>
+                    <p className="text-xs md:text-sm text-pink-800 print:text-slate-600">Total Souls Won</p>
+                    <p className="text-2xl md:text-3xl font-black text-pink-600 print:text-slate-900">{data.summary.soulsTotal}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-pink-800 print:text-slate-600">Status</p>
-                    <p className="text-lg font-bold text-pink-700 print:text-slate-800">
+                    <p className="text-xs md:text-sm text-pink-800 print:text-slate-600">Status</p>
+                    <p className="text-sm md:text-lg font-bold text-pink-700 print:text-slate-800">
                       {data.summary.soulsTotal > 0 ? "Growing" : "Static"}
                     </p>
                   </div>
@@ -178,7 +178,7 @@ export const SMRReports = () => {
             </div>
 
             {/* FOOTER */}
-            <div className="pt-12 mt-12 border-t border-slate-200 text-center text-slate-400 text-xs">
+            <div className="pt-8 md:pt-12 mt-8 md:mt-12 border-t border-slate-200 text-center text-slate-400 text-[10px] md:text-xs">
                <p>Generated automatically by SMR Portal • {new Date().toLocaleDateString()}</p>
             </div>
 

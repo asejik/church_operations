@@ -101,10 +101,15 @@ export const SoulsPage = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-slate-900">Souls Won</h1><p className="text-slate-500">Track evangelism and kingdom expansion</p></div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+           <h1 className="text-2xl font-bold text-slate-900">Souls Won</h1>
+           <p className="text-slate-500">Track evangelism and kingdom expansion</p>
+        </div>
         {profile?.role !== 'unit_pastor' && (
-          <Button onClick={() => setIsAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> Report Soul</Button>
+          <Button onClick={() => setIsAddOpen(true)} className="w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> Report Soul
+          </Button>
         )}
       </div>
 
@@ -182,24 +187,95 @@ export const SoulsPage = () => {
           />
         </div>
 
-        {/* MONTH FILTER (Added to Unit Dashboard) */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto items-center">
           <input
             type="month"
-            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-pink-500"
+            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-pink-500 w-full md:w-auto"
             value={selectedMonth}
             onChange={e => setSelectedMonth(e.target.value)}
           />
 
           {(selectedMonth || searchQuery) && (
-             <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setSelectedMonth(''); }}>
-               <X className="h-4 w-4" />
+             <Button variant="ghost" size="sm" className="h-10 px-3 text-slate-500 hover:text-red-500 shrink-0" onClick={() => { setSearchQuery(''); setSelectedMonth(''); }}>
+               <X className="h-4 w-4 mr-1" /> Reset
              </Button>
           )}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* --- MOBILE: CARD LIST (< md) --- */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+           <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
+        ) : filteredRecords.length === 0 ? (
+           <div className="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm">
+             <Heart className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+             <p className="text-sm">No souls found for this period.</p>
+           </div>
+        ) : (
+          filteredRecords.map((record, i) => (
+            <div key={record.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-3 relative">
+
+               {/* S/N Badge */}
+               <span className="absolute top-4 right-4 text-xs font-mono text-slate-400">
+                 #{(i + 1).toString().padStart(2, '0')}
+               </span>
+
+               {/* Top: Convert Info */}
+               <div className="pr-8">
+                 <h3 className="font-bold text-slate-900 text-lg leading-tight">{record.convert_name || "—"}</h3>
+                 {record.convert_phone && (
+                   <div className="flex items-center gap-1.5 text-slate-500 text-sm mt-1">
+                      <Phone className="h-3.5 w-3.5" /> {record.convert_phone}
+                   </div>
+                 )}
+               </div>
+
+               {/* Middle: Winner Info */}
+               <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100 mt-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Won By:</span>
+                  <div className="flex items-center gap-1.5">
+                    {record.members?.image_url ? (
+                      <img src={record.members.image_url} alt="" className="h-4 w-4 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0"><User className="h-2.5 w-2.5" /></div>
+                    )}
+                    <span className="text-xs font-semibold text-slate-700">
+                      {record.members?.full_name || record.soul_winner_name || "Unknown"}
+                    </span>
+                  </div>
+               </div>
+
+               {/* Bottom: Notes & Actions */}
+               <div className="flex flex-col gap-2 pt-2 border-t border-slate-50 mt-1">
+                 {record.notes && (
+                   <p className="text-xs text-slate-500 italic bg-white border border-slate-100 p-2 rounded line-clamp-3">
+                     "{record.notes}"
+                   </p>
+                 )}
+                 <div className="flex items-center justify-between mt-1">
+                   <div className="flex items-center gap-1 text-xs text-slate-400">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(record.report_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                   </div>
+                   <Button
+                     variant="ghost"
+                     size="sm"
+                     className="text-slate-400 hover:text-red-500 hover:bg-red-50 h-7 px-2"
+                     onClick={() => handleDelete(record.id)}
+                     isLoading={deleteLoading === record.id}
+                   >
+                     <Trash2 className="h-3.5 w-3.5" />
+                   </Button>
+                 </div>
+               </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* --- DESKTOP: TABLE (>= md) --- */}
+      <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           {loading ? (
              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
