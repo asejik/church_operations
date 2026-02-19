@@ -5,7 +5,7 @@ import { AddMemberModal } from '@/components/members/AddMemberModal';
 import { BatchUploadModal } from '@/components/members/BatchUploadModal';
 import { MemberDetailsModal } from '@/components/members/MemberDetailsModal';
 import { RequestsTab } from '@/components/members/RequestsTab';
-import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox, X, Loader2, Building2 } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, RefreshCw, ArrowUpDown, ChevronRight, Crown, Shield, Users, Inbox, X, Loader2, Building2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
 import { type Member } from '@/lib/db';
@@ -295,8 +295,37 @@ export const MembersPage = () => {
               </div>
            </div>
 
-           {/* TABLE */}
-           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+           {/* --- MOBILE: CARD LIST (< md) --- */}
+           <div className="md:hidden space-y-3">
+             {processedMembers.map((member) => (
+               <div key={member.id} onClick={() => setSelectedMember(member)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:scale-[0.99] transition-transform">
+                 <div className="flex items-start justify-between">
+                   <div className="flex items-center gap-3">
+                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg">
+                       {member.full_name[0]}
+                     </div>
+                     <div>
+                       <div className="flex items-center gap-1.5">
+                         <h3 className="font-bold text-slate-900">{member.full_name}</h3>
+                         {member.role_in_unit === 'unit_head' && <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />}
+                       </div>
+                       <p className="text-xs text-slate-500">{getSubunitName(member.subunit_id)}</p>
+                     </div>
+                   </div>
+                   <ChevronRight className="h-5 w-5 text-slate-300" />
+                 </div>
+                 <div className="mt-3 flex items-center gap-4 text-xs text-slate-500 border-t border-slate-50 pt-2">
+                    <div className="flex items-center gap-1"><Phone className="h-3 w-3" /> {member.phone_number || "—"}</div>
+                    <div className="flex gap-1">
+                      {member.employment_status?.slice(0,1).map(s => <span key={s} className="bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{s}</span>)}
+                    </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+
+           {/* --- DESKTOP: TABLE (>= md) --- */}
+           <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
              {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-300" /></div>
              ) : (

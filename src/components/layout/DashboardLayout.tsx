@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { MobileBottomNav } from './MobileBottomNav';
 import { Background } from './Background';
 import { Outlet } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
@@ -31,49 +32,58 @@ export const DashboardLayout = () => {
     );
   }
 
-  // --- DISTINCT THEME FOR PASTOR-IN-CHARGE (UNIT PASTOR) ---
   const isUnitPastor = profile?.role === 'unit_pastor';
-
-  // Apply a distinct background tint for Unit Pastors
-  const themeClasses = isUnitPastor
-    ? "bg-indigo-50/50" // Subtle Purple/Indigo tint
-    : "bg-slate-50/50"; // Default Slate
+  const themeClasses = isUnitPastor ? "bg-indigo-50/30" : "bg-slate-50/50";
 
   return (
     <div className={`relative min-h-screen ${themeClasses}`}>
       <Background />
 
-      {/* Sidebar (Desktop) */}
-      <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:block fixed inset-y-0 left-0 z-40 md:relative`}>
+      {/* --- DESKTOP SIDEBAR --- */}
+      <div className="hidden md:flex fixed inset-y-0 left-0 z-50 w-64 flex-col">
          <Sidebar />
       </div>
 
-      {/* Main Content Area */}
-      <main className="md:pl-64 transition-all duration-300 flex flex-col min-h-screen">
+      {/* --- MOBILE DRAWER --- */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* Overlay */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
 
-        {/* --- GLOBAL HEADER --- */}
-        <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-
-        {/* --- UNIT PASTOR BANNER --- */}
-        {isUnitPastor && (
-          <div className="bg-indigo-600 text-white px-6 py-2 shadow-md flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider relative z-10">
-            <ShieldCheck className="h-4 w-4" />
-            <span>Pastor-in-Charge View (Approval Mode)</span>
+          {/* Sidebar with Close Prop */}
+          <div className="relative flex w-72 flex-1 flex-col bg-white shadow-2xl animate-in slide-in-from-left duration-200">
+             <Sidebar onMobileClick={() => setIsMobileMenuOpen(false)} />
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-1">
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex flex-col min-h-screen md:pl-64 transition-all duration-300 pb-20 md:pb-0">
+
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-20 w-full bg-slate-50/80 backdrop-blur-md">
+           <Header onMenuClick={() => setIsMobileMenuOpen(true)} />
+
+           {/* Unit Pastor Banner */}
+           {isUnitPastor && (
+            <div className="bg-indigo-600 text-white px-4 py-2 shadow-md flex items-center justify-center gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Pastor-in-Charge (Approval Mode)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Page Content */}
+        <div className="flex-1 px-4 py-4 md:p-8 max-w-7xl mx-auto w-full">
           <Outlet />
         </div>
       </main>
 
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      {/* --- MOBILE BOTTOM NAV --- */}
+      <MobileBottomNav onMenuClick={() => setIsMobileMenuOpen(true)} />
     </div>
   );
 };

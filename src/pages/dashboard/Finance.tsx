@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import {
   Plus, Search, CheckCircle, XCircle, Clock, Loader2,
-  MessageSquare, X, ChevronLeft, ChevronRight, FileText, Settings2
+  MessageSquare, X, ChevronLeft, ChevronRight, FileText, Settings2, Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
@@ -171,8 +171,65 @@ export const FinancePage = () => {
          </div>
       </div>
 
-      {/* --- REQUESTS TABLE --- */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
+      {/* --- MOBILE: CARD LIST (< md) --- */}
+      <div className="md:hidden space-y-3">
+        {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
+          filteredRequests.length === 0 ? (
+             <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                <p className="text-xs">No requests found.</p>
+             </div>
+          ) : (
+            filteredRequests.map((req) => (
+              <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-3 active:scale-[0.99] transition-transform" onClick={() => isAdmin && req.status === 'pending' && setSelectedRequest(req)}>
+
+                 {/* Top Row: Purpose + Amount */}
+                 <div className="flex justify-between items-start">
+                   <div>
+                     <h3 className="font-bold text-slate-900 line-clamp-1">{req.purpose || req.title}</h3>
+                     {isAdmin && <p className="text-[10px] text-slate-500 uppercase font-medium mt-0.5">{req.units?.name} • {req.profiles?.full_name}</p>}
+                   </div>
+                   <span className="font-mono font-bold text-slate-900 bg-slate-50 px-2 py-1 rounded text-sm">{formatCurrency(req.amount)}</span>
+                 </div>
+
+                 {/* Middle: Status Badge */}
+                 <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                      req.status === 'approved' ? 'bg-green-50 text-green-700' :
+                      req.status === 'rejected' ? 'bg-red-50 text-red-700' :
+                      'bg-amber-50 text-amber-700'
+                    }`}>
+                        {req.status === 'approved' && <CheckCircle className="h-3 w-3" />}
+                        {req.status === 'rejected' && <XCircle className="h-3 w-3" />}
+                        {req.status === 'pending' && <Clock className="h-3 w-3" />}
+                        {req.status}
+                    </span>
+                    {req.reviewer && (
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        by {getReviewerLabel(req.reviewer.role)}
+                      </span>
+                    )}
+                 </div>
+
+                 {/* Bottom: Date + Action hint */}
+                 <div className="flex items-center justify-between border-t border-slate-50 pt-2 mt-1">
+                    <div className="flex items-center gap-1 text-xs text-slate-400">
+                       <Calendar className="h-3 w-3" /> {formatDate(req.created_at)}
+                    </div>
+                    {isAdmin && req.status === 'pending' && (
+                       <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
+                          Review <ChevronRight className="h-3 w-3" />
+                       </span>
+                    )}
+                 </div>
+              </div>
+            ))
+          )
+        )}
+      </div>
+
+      {/* --- DESKTOP: TABLE (>= md) --- */}
+      <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
         {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
           <table className="w-full text-left text-sm">
             <thead>
