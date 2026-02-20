@@ -20,9 +20,6 @@ import { DashboardHome } from "@/pages/dashboard/Home";
 import { SettingsPage } from "@/pages/dashboard/Settings";
 import { AnnouncementsPage } from "@/pages/dashboard/Announcements";
 
-// Admin Pages
-import { AdminDashboard } from "@/pages/admin/AdminDashboard";
-
 // Evangelism Pages
 import { EvangelismOverview } from "@/pages/evangelism/EvangelismOverview";
 import { EvangelismReports } from "@/pages/evangelism/EvangelismReports";
@@ -89,7 +86,6 @@ function App() {
 
           {/* ADMIN PORTAL ROUTES (Pastor Queen) */}
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
