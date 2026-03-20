@@ -202,7 +202,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
           </div>
           <div className="mt-3 text-center">
             <h2 className="text-lg font-bold text-slate-900">{formData.full_name}</h2>
-            <p className="text-xs text-slate-500 uppercase mb-4">{formData.role_in_unit?.replace('_', ' ') || 'Member'}</p>
+            <p className="text-xs text-slate-500 uppercase mb-4">{formData.role_in_unit?.replace(/_/g, ' ') || 'Member'}</p>
 
             {!isReadOnly && !activeAction && (
               <div className="flex gap-3 justify-center">
@@ -313,7 +313,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({ member, 
           <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-2"><Shield className="h-3 w-3" /> Unit Roles</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
              <div><label className="text-xs font-bold text-slate-500 uppercase">Subunit</label><select disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100" value={formData.subunit_id || ''} onChange={e => setFormData({ ...formData, subunit_id: e.target.value ? Number(e.target.value) : undefined })}><option value="">-- None --</option>{subunits?.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-             <div><label className="text-xs font-bold text-slate-500 uppercase">Role</label><select disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100" value={formData.role_in_unit || 'member'} onChange={e => setFormData({ ...formData, role_in_unit: e.target.value })}><option value="member">Member</option><option value="subunit_head">Subunit Head</option><option value="unit_head">Unit Head</option></select></div>
+             <div><label className="text-xs font-bold text-slate-500 uppercase">Role</label><select disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 disabled:bg-slate-100" value={formData.role_in_unit || 'member'} onChange={e => setFormData({ ...formData, role_in_unit: e.target.value })}><option value="member">Member</option><option value="subunit_head">Subunit Head</option><option value="assistant_unit_head">Assistant Unit Head</option><option value="unit_head">Unit Head</option></select></div>
           </div>
         </div>
 

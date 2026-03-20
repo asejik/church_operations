@@ -20,7 +20,8 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({ isOpen, 
   const [formData, setFormData] = useState({
     amount: '',
     purpose: '',
-    description: ''
+    description: '',
+    is_urgent: false
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,7 +61,8 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({ isOpen, 
           amount: parseFloat(formData.amount),
           purpose: formData.purpose,
           description: formData.description,
-          receipt_url: receiptUrl
+          receipt_url: receiptUrl,
+          is_urgent: formData.is_urgent
         });
 
       if (dbError) throw dbError;
@@ -69,7 +71,7 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({ isOpen, 
       onRequestCreated();
       onClose();
       // Reset form
-      setFormData({ amount: '', purpose: '', description: '' });
+      setFormData({ amount: '', purpose: '', description: '', is_urgent: false });
       setFile(null);
 
     } catch (err: any) {
@@ -136,6 +138,18 @@ export const CreateRequestModal: React.FC<CreateRequestModalProps> = ({ isOpen, 
               {file ? file.name : "Tap to upload image"}
             </label>
           </div>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer border rounded-xl p-3 bg-red-50/50 border-red-100">
+            <input
+              type="checkbox"
+              className="rounded border-slate-300 text-red-600 focus:ring-red-500 h-4 w-4"
+              checked={formData.is_urgent}
+              onChange={e => setFormData({...formData, is_urgent: e.target.checked})}
+            />
+            <span className="font-bold text-red-600">Mark as Urgent</span>
+          </label>
         </div>
 
         <div className="pt-2">

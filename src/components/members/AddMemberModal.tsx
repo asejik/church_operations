@@ -111,6 +111,7 @@ export const AddMemberModal = ({ isOpen, onClose, onSuccess }: AddMemberModalPro
             >
               <option value="member">Member</option>
               <option value="subunit_head">Subunit Head</option>
+              <option value="assistant_unit_head">Assistant Unit Head</option>
               <option value="unit_head">Unit Head</option>
             </select>
           </div>

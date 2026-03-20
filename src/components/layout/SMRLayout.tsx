@@ -25,6 +25,7 @@ import {
   User,
   ChevronDown
 } from 'lucide-react';
+import { ChangelogModal } from '@/components/ui/ChangelogModal';
 
 // --- SUB-COMPONENT: EDIT PROFILE & SECURITY ---
 const SMRProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boolean; onClose: () => void; profile: any; onUpdate: () => void }) => {
@@ -337,6 +338,7 @@ export const SMRLayout = () => {
         profile={profile}
         onUpdate={refetch}
       />
+      <ChangelogModal />
     </div>
   );
 };

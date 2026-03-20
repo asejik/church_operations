@@ -19,6 +19,7 @@ import {
   User,
   ChevronDown
 } from 'lucide-react';
+import { ChangelogModal } from '@/components/ui/ChangelogModal';
 
 // --- SUB-COMPONENT: ADMIN PROFILE MODAL ---
 const AdminProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boolean; onClose: () => void; profile: any; onUpdate: () => void }) => {
@@ -300,6 +301,7 @@ export const AdminLayout = () => {
         profile={profile}
         onUpdate={refetch}
       />
+      <ChangelogModal />
     </div>
   );
 };

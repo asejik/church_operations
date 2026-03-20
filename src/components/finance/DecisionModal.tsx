@@ -80,7 +80,10 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, r
 
           <div className="pt-2 border-t border-slate-200">
             <p className="text-xs font-bold text-slate-500 uppercase mb-1">Purpose</p>
-            <p className="text-sm font-medium text-slate-900">{request.purpose}</p>
+            <p className="text-sm font-medium text-slate-900">
+              {request.is_urgent && <span className="mr-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-100">URGENT</span>}
+              {request.purpose}
+            </p>
             <p className="text-xs text-slate-600 mt-1">{request.description}</p>
           </div>
         </div>

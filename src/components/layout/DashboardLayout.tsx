@@ -6,6 +6,7 @@ import { Background } from './Background';
 import { Outlet } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, ShieldCheck } from 'lucide-react';
+import { ChangelogModal } from '@/components/ui/ChangelogModal';
 
 export const DashboardLayout = () => {
   const { data: profile, isLoading, isError } = useProfile();
@@ -84,6 +85,7 @@ export const DashboardLayout = () => {
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <MobileBottomNav onMenuClick={() => setIsMobileMenuOpen(true)} />
+      <ChangelogModal />
     </div>
   );
 };

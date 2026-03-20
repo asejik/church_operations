@@ -13,7 +13,7 @@ interface ReviewModalProps {
   onReviewSubmitted: () => void;
   members: any[];
   unitId: string;
-  initialData?: any; // <--- NEW: Data to edit
+  initialData?: any;
 }
 
 // Internal Component for a single Rating Row
@@ -32,7 +32,6 @@ const RatingRow = ({
 }) => {
   const [showComment, setShowComment] = useState(!!comment);
 
-  // If initial data has a comment, ensure input is shown
   useEffect(() => {
     if (comment) setShowComment(true);
   }, [comment]);
@@ -93,7 +92,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     member_id: '',
     month: new Date().toISOString().slice(0, 7),
 
-    // Ratings
     rating_punctuality: 0,
     rating_communication: 0,
     rating_commitment: 0,
@@ -101,7 +99,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     rating_responsibility: 0,
     rating_spiritual: 0,
 
-    // Specific Comments
     comment_punctuality: '',
     comment_communication: '',
     comment_commitment: '',
@@ -112,7 +109,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     comment: ''
   });
 
-  // Load Initial Data for Editing
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
@@ -137,7 +133,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
           comment: initialData.comment || ''
         });
       } else {
-        // Reset for new entry
         setFormData({
           member_id: '',
           month: new Date().toISOString().slice(0, 7),
@@ -173,7 +168,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         unit_id: unitId,
         member_id: formData.member_id,
         reviewer_id: profile?.id,
-        // If editing, keep original date, else use today
         review_date: initialData ? initialData.review_date : new Date().toISOString().split('T')[0],
         month: `${formData.month}-01`,
 
@@ -195,18 +189,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       };
 
       if (initialData) {
-        // UPDATE MODE
-        const { error } = await supabase
-          .from('performance_reviews')
-          .update(payload)
-          .eq('id', initialData.id);
+        const { error } = await supabase.from('performance_reviews').update(payload).eq('id', initialData.id);
         if (error) throw error;
         toast.success("Review updated successfully");
       } else {
-        // CREATE MODE
-        const { error } = await supabase
-          .from('performance_reviews')
-          .insert(payload);
+        const { error } = await supabase.from('performance_reviews').insert(payload);
         if (error) throw error;
         toast.success("Review submitted successfully");
       }
@@ -223,96 +210,65 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={initialData ? "Edit Review" : "New Performance Review"}>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">Member</label>
-            <select
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
-              value={formData.member_id}
-              onChange={e => setFormData({...formData, member_id: e.target.value})}
-              disabled={!!initialData} // Lock member when editing
-            >
-              <option value="">-- Choose Member --</option>
-              {members?.map(m => (
-                <option key={m.id} value={m.id}>{m.full_name}</option>
-              ))}
-            </select>
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh] sm:max-h-[85vh]">
+
+        {/* SCROLLABLE AREA */}
+        <div className="flex-1 overflow-y-auto space-y-5 pr-2 pb-6 custom-scrollbar">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+             <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">Member</label>
+              <select
+                className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50"
+                value={formData.member_id}
+                onChange={e => setFormData({...formData, member_id: e.target.value})}
+                disabled={!!initialData}
+              >
+                <option value="">-- Choose Member --</option>
+                {members?.map(m => (
+                  <option key={m.id} value={m.id}>{m.full_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">Review Month</label>
+              <Input
+                type="month"
+                value={formData.month}
+                onChange={e => setFormData({...formData, month: e.target.value})}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <h3 className="mb-3 text-xs font-bold uppercase text-slate-400">Scorecard</h3>
+            <div className="space-y-1">
+              <RatingRow label="Punctuality" value={formData.rating_punctuality} comment={formData.comment_punctuality} onChangeValue={v => setFormData(p => ({...p, rating_punctuality: v}))} onChangeComment={v => setFormData(p => ({...p, comment_punctuality: v}))} />
+              <RatingRow label="Communication" value={formData.rating_communication} comment={formData.comment_communication} onChangeValue={v => setFormData(p => ({...p, rating_communication: v}))} onChangeComment={v => setFormData(p => ({...p, comment_communication: v}))} />
+              <RatingRow label="Commitment to Service" value={formData.rating_commitment} comment={formData.comment_commitment} onChangeValue={v => setFormData(p => ({...p, rating_commitment: v}))} onChangeComment={v => setFormData(p => ({...p, comment_commitment: v}))} />
+              <RatingRow label="Teamwork" value={formData.rating_teamwork} comment={formData.comment_teamwork} onChangeValue={v => setFormData(p => ({...p, rating_teamwork: v}))} onChangeComment={v => setFormData(p => ({...p, comment_teamwork: v}))} />
+              <RatingRow label="Responsibility & Reliability" value={formData.rating_responsibility} comment={formData.comment_responsibility} onChangeValue={v => setFormData(p => ({...p, rating_responsibility: v}))} onChangeComment={v => setFormData(p => ({...p, comment_responsibility: v}))} />
+              <RatingRow label="Spiritual Attitude" value={formData.rating_spiritual} comment={formData.comment_spiritual} onChangeValue={v => setFormData(p => ({...p, rating_spiritual: v}))} onChangeComment={v => setFormData(p => ({...p, comment_spiritual: v}))} />
+            </div>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">Review Month</label>
-            <Input
-              type="month"
-              value={formData.month}
-              onChange={e => setFormData({...formData, month: e.target.value})}
-              required
+            <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">General Comments</label>
+            <textarea
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              rows={2}
+              value={formData.comment}
+              onChange={e => setFormData({...formData, comment: e.target.value})}
+              placeholder="Overall observations..."
             />
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-          <h3 className="mb-3 text-xs font-bold uppercase text-slate-400">Scorecard</h3>
-          <div className="space-y-1">
-            <RatingRow
-              label="Punctuality"
-              value={formData.rating_punctuality}
-              comment={formData.comment_punctuality}
-              onChangeValue={v => setFormData(p => ({...p, rating_punctuality: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_punctuality: v}))}
-            />
-            <RatingRow
-              label="Communication"
-              value={formData.rating_communication}
-              comment={formData.comment_communication}
-              onChangeValue={v => setFormData(p => ({...p, rating_communication: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_communication: v}))}
-            />
-            <RatingRow
-              label="Commitment to Service"
-              value={formData.rating_commitment}
-              comment={formData.comment_commitment}
-              onChangeValue={v => setFormData(p => ({...p, rating_commitment: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_commitment: v}))}
-            />
-            <RatingRow
-              label="Teamwork"
-              value={formData.rating_teamwork}
-              comment={formData.comment_teamwork}
-              onChangeValue={v => setFormData(p => ({...p, rating_teamwork: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_teamwork: v}))}
-            />
-            <RatingRow
-              label="Responsibility & Reliability"
-              value={formData.rating_responsibility}
-              comment={formData.comment_responsibility}
-              onChangeValue={v => setFormData(p => ({...p, rating_responsibility: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_responsibility: v}))}
-            />
-            <RatingRow
-              label="Spiritual Attitude"
-              value={formData.rating_spiritual}
-              comment={formData.comment_spiritual}
-              onChangeValue={v => setFormData(p => ({...p, rating_spiritual: v}))}
-              onChangeComment={v => setFormData(p => ({...p, comment_spiritual: v}))}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase">General Comments</label>
-          <textarea
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-            rows={2}
-            value={formData.comment}
-            onChange={e => setFormData({...formData, comment: e.target.value})}
-            placeholder="Overall observations..."
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} isLoading={loading}>
+        {/* STICKY FOOTER */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 shrink-0 bg-white mt-2">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button type="submit" isLoading={loading}>
             {initialData ? "Update Review" : "Submit Review"}
           </Button>
         </div>

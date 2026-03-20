@@ -186,7 +186,10 @@ export const FinancePage = () => {
                  {/* Top Row: Purpose + Amount */}
                  <div className="flex justify-between items-start">
                    <div>
-                     <h3 className="font-bold text-slate-900 line-clamp-1">{req.purpose || req.title}</h3>
+                     <h3 className="font-bold text-slate-900 line-clamp-1">
+                       {req.is_urgent && <span className="mr-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-100">URGENT</span>}
+                       {req.purpose || req.title}
+                     </h3>
                      {isAdmin && <p className="text-[10px] text-slate-500 uppercase font-medium mt-0.5">{req.units?.name} • {req.profiles?.full_name}</p>}
                    </div>
                    <span className="font-mono font-bold text-slate-900 bg-slate-50 px-2 py-1 rounded text-sm">{formatCurrency(req.amount)}</span>
@@ -287,7 +290,10 @@ export const FinancePage = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">{req.purpose || req.title}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
+                      {req.is_urgent && <span className="mr-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-100">URGENT</span>}
+                      {req.purpose || req.title}
+                    </td>
 
                     <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[250px]" title={req.description}>
                       <div className="truncate mb-1">{req.description || "—"}</div>
