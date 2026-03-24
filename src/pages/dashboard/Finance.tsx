@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import {
   Plus, Search, CheckCircle, XCircle, Clock, Loader2,
-  MessageSquare, X, ChevronLeft, ChevronRight, FileText, Settings2, Calendar
+  MessageSquare, X, ChevronLeft, ChevronRight, FileText, Settings2, Calendar, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile } from '@/hooks/useProfile';
@@ -32,7 +32,6 @@ export const FinancePage = () => {
     if (!profile) return;
     setLoading(true);
     try {
-      // CRITICAL: Added 'reviewer:reviewed_by(full_name, role)' to the select string
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
@@ -40,7 +39,8 @@ export const FinancePage = () => {
           units(name),
           profiles:requester_id(full_name),
           reviewer:reviewed_by(full_name, role)
-        `);
+        `)
+        .eq('is_archived', false);
 
       if (!isAdmin) {
         reqQuery = reqQuery.eq('unit_id', profile.unit_id);
@@ -66,6 +66,25 @@ export const FinancePage = () => {
   useEffect(() => {
     fetchData();
   }, [profile?.unit_id, isAdmin]);
+
+  // --- SOFT DELETE HANDLER ---
+  const handleArchive = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm("Remove this request from the view? (It will be kept safely on the server)")) return;
+
+    try {
+      const { error } = await supabase
+        .from('financial_requests')
+        .update({ is_archived: true })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success("Record removed from view");
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to remove record");
+    }
+  };
 
   // --- FILTER LOGIC ---
   const filterRequests = (item: any) => {
@@ -99,7 +118,6 @@ export const FinancePage = () => {
 
   const isCurrentMonth = currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
 
-  // Helper to get friendly role name
   const getReviewerLabel = (role?: string) => {
     if (role === 'smr') return 'SMR';
     if (role === 'admin_pastor') return 'Admin';
@@ -207,6 +225,14 @@ export const FinancePage = () => {
                         {req.status === 'pending' && <Clock className="h-3 w-3" />}
                         {req.status}
                     </span>
+
+                    {/* NEW: Mobile Acknowledged Tag */}
+                    {req.status === 'pending' && req.is_acknowledged && (
+                      <span className="inline-flex items-center px-1.5 py-1 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100 uppercase">
+                        Acknowledged
+                      </span>
+                    )}
+
                     {req.reviewer && (
                       <span className="text-[10px] text-slate-400 font-medium">
                         by {getReviewerLabel(req.reviewer.role)}
@@ -219,10 +245,17 @@ export const FinancePage = () => {
                     <div className="flex items-center gap-1 text-xs text-slate-400">
                        <Calendar className="h-3 w-3" /> {formatDate(req.created_at)}
                     </div>
-                    {isAdmin && req.status === 'pending' && (
-                       <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                          Review <ChevronRight className="h-3 w-3" />
-                       </span>
+                    {isAdmin && (
+                       <div className="flex items-center gap-3">
+                         <button onClick={(e) => handleArchive(e, req.id)} className="text-slate-300 hover:text-red-500" title="Remove from view">
+                           <Trash2 className="h-4 w-4" />
+                         </button>
+                         {req.status === 'pending' && (
+                           <span className="text-xs font-bold text-blue-600 flex items-center gap-1" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); }}>
+                              Review <ChevronRight className="h-3 w-3" />
+                           </span>
+                         )}
+                       </div>
                     )}
                  </div>
               </div>
@@ -234,100 +267,119 @@ export const FinancePage = () => {
       {/* --- DESKTOP: TABLE (>= md) --- */}
       <div className="hidden md:block overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm mt-4">
         {loading ? <div className="p-8 text-center text-slate-400">Loading...</div> : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
-                <th className="px-4 py-3 w-12 text-center border-r border-slate-100">S/N</th>
-                {isAdmin && <th className="px-4 py-3 border-r border-slate-100">Unit</th>}
-                <th className="px-4 py-3 w-32 border-r border-slate-100 text-center">Status</th>
-                <th className="px-4 py-3 border-r border-slate-100">Purpose</th>
-                <th className="px-4 py-3 border-r border-slate-100">Details</th>
-                <th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th>
-                <th className="px-4 py-3 w-24 text-right">Date</th>
-                {isAdmin && <th className="px-4 py-3 w-20 text-center">Action</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
-                    <div className="flex flex-col items-center gap-2">
-                      <FileText className="h-10 w-10 text-slate-300" />
-                      <p>No requests found for {format(currentDate, 'MMMM')}.</p>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                  <th className="px-4 py-3 w-12 text-center border-r border-slate-100">S/N</th>
+                  {isAdmin && <th className="px-4 py-3 border-r border-slate-100">Unit</th>}
+                  <th className="px-4 py-3 w-32 border-r border-slate-100 text-center">Status</th>
+                  <th className="px-4 py-3 border-r border-slate-100">Purpose</th>
+                  <th className="px-4 py-3 border-r border-slate-100">Details</th>
+                  <th className="px-4 py-3 border-r border-slate-100 text-right">Amount</th>
+                  <th className="px-4 py-3 w-24 text-right">Date</th>
+                  {isAdmin && <th className="px-4 py-3 w-24 text-center">Action</th>}
                 </tr>
-              ) : (
-                filteredRequests.map((req, index) => (
-                  <tr key={req.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td>
-
-                    {isAdmin && (
-                      <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
-                          {req.units?.name}
-                          <div className="text-[10px] text-slate-500 font-normal">{req.profiles?.full_name}</div>
-                      </td>
-                    )}
-
-                    <td className="px-4 py-3 text-center border-r border-slate-100">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${
-                          req.status === 'approved' || req.status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
-                          req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                          'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                            {req.status === 'approved' && <CheckCircle className="h-3 w-3" />}
-                            {req.status === 'rejected' && <XCircle className="h-3 w-3" />}
-                            {req.status === 'pending' && <Clock className="h-3 w-3" />}
-                            {req.status}
-                        </span>
-
-                        {/* REVIEWER LABEL */}
-                        {req.status !== 'pending' && req.reviewer && (
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                            by {getReviewerLabel(req.reviewer.role)}
-                          </span>
-                        )}
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdmin ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText className="h-10 w-10 text-slate-300" />
+                        <p>No requests found for {format(currentDate, 'MMMM')}.</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
-                      {req.is_urgent && <span className="mr-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-100">URGENT</span>}
-                      {req.purpose || req.title}
-                    </td>
+                  </tr>
+                ) : (
+                  filteredRequests.map((req, index) => (
+                    <tr key={req.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-center text-slate-400 font-mono text-xs border-r border-slate-100">{(index + 1).toString().padStart(2, '0')}</td>
 
-                    <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[250px]" title={req.description}>
-                      <div className="truncate mb-1">{req.description || "—"}</div>
-                      {req.admin_comment && (
-                        <div className="mt-1 flex items-start gap-1 bg-amber-50 border border-amber-100 p-1.5 rounded-md text-[10px] text-amber-800">
-                            <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
-                            <span className="font-medium">Admin: {req.admin_comment}</span>
-                        </div>
+                      {isAdmin && (
+                        <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
+                            {req.units?.name}
+                            <div className="text-[10px] text-slate-500 font-normal">{req.profiles?.full_name}</div>
+                        </td>
                       )}
-                    </td>
 
-                    <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 border-r border-slate-100">{formatCurrency(req.amount)}</td>
-                    <td className="px-4 py-3 text-right text-slate-500 text-xs border-r border-slate-100">{formatDate(req.request_date || req.created_at)}</td>
+                      <td className="px-4 py-3 text-center border-r border-slate-100">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase border ${
+                            req.status === 'approved' || req.status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                            req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                            'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                              {req.status === 'approved' && <CheckCircle className="h-3 w-3" />}
+                              {req.status === 'rejected' && <XCircle className="h-3 w-3" />}
+                              {req.status === 'pending' && <Clock className="h-3 w-3" />}
+                              {req.status}
+                          </span>
 
-                    {/* Action Column for Admins/SMR */}
-                    {isAdmin && (
-                      <td className="px-4 py-3 text-center">
-                        {req.status === 'pending' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => setSelectedRequest(req)}
-                          >
-                            <Settings2 className="h-3 w-3 mr-1" /> Review
-                          </Button>
+                          {/* NEW: Desktop Acknowledged Tag */}
+                          {req.status === 'pending' && req.is_acknowledged && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-tight mt-0.5">
+                              Acknowledged
+                            </span>
+                          )}
+
+                          {req.status !== 'pending' && req.reviewer && (
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                              by {getReviewerLabel(req.reviewer.role)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900 border-r border-slate-100">
+                        {req.is_urgent && <span className="mr-2 inline-flex items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-100">URGENT</span>}
+                        {req.purpose || req.title}
+                      </td>
+
+                      <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[250px]" title={req.description}>
+                        <div className="truncate mb-1">{req.description || "—"}</div>
+                        {req.admin_comment && (
+                          <div className="mt-1 flex items-start gap-1 bg-amber-50 border border-amber-100 p-1.5 rounded-md text-[10px] text-amber-800">
+                              <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
+                              <span className="font-medium">Admin: {req.admin_comment}</span>
+                          </div>
                         )}
                       </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+
+                      <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 border-r border-slate-100">{formatCurrency(req.amount)}</td>
+                      <td className="px-4 py-3 text-right text-slate-500 text-xs border-r border-slate-100">{formatDate(req.request_date || req.created_at)}</td>
+
+                      {/* Action Column for Admins/SMR */}
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {req.status === 'pending' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); }}
+                              >
+                                <Settings2 className="h-3 w-3 mr-1" /> Review
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              onClick={(e) => handleArchive(e, req.id)}
+                              title="Remove from view"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

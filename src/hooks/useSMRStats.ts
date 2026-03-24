@@ -19,7 +19,7 @@ export interface SMRStats {
     family: number;
     avgMonthly: number;
     history: { date: string; type: string; count: number }[];
-    absenceReasons: { reason: string; count: number }[]; // <--- NEW
+    absenceReasons: { reason: string; count: number }[];
   };
   finance: {
     spendingByUnit: { name: string; value: number }[];
@@ -97,25 +97,23 @@ export const useSMRStats = () => {
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('*, events!inner(event_type)')
-        // .eq('status', 'present') <--- REMOVED to catch Absentees
         .gte('event_date', threeMonthsAgo);
 
       let sundayCount = 0;
       let midweekCount = 0;
       let familyCount = 0;
       const historyMap = new Map<string, { date: string, type: string, count: number }>();
-      const absenceMap = new Map<string, number>(); // <--- NEW
+      const absenceMap = new Map<string, number>();
 
       attendanceData?.forEach((record: any) => {
         // Handle Absence Reasons
         if (record.status === 'absent' && record.reason) {
-           // Normalize: Capitalize first letter, trim
            const raw = record.reason.trim();
            const reason = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
            if (reason) absenceMap.set(reason, (absenceMap.get(reason) || 0) + 1);
         }
 
-        // Handle Present Counts (Only count if status is present)
+        // Handle Present Counts
         if (record.status === 'present') {
             const type = record.events?.event_type || 'Unknown';
             const dateKey = record.event_date.split('T')[0];
@@ -147,10 +145,12 @@ export const useSMRStats = () => {
         .select('*')
         .gte('created_at', firstDayMonth);
 
+      // CRITICAL FIX: Ignore archived requests from the pending count
       const { count: pendingCount } = await supabase
         .from('financial_requests')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .eq('is_archived', false);
 
       const spendMap = new Map();
       expenses?.filter(e => e.status === 'approved' || e.status === 'paid').forEach((e: any) => {
@@ -221,7 +221,7 @@ export const useSMRStats = () => {
           family: familyCount,
           avgMonthly: 0,
           history: Array.from(historyMap.values()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-          absenceReasons: topAbsenceReasons // <--- Added
+          absenceReasons: topAbsenceReasons
         },
         finance: {
           spendingByUnit: Array.from(spendMap).map(([name, value]) => ({ name, value: value as number })),

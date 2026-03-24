@@ -3,7 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 
 interface DecisionModalProps {
@@ -16,9 +16,46 @@ interface DecisionModalProps {
 export const DecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, request, onComplete }) => {
   const { data: profile } = useProfile();
   const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState<'approve' | 'reject' | null>(null);
+  const [loading, setLoading] = useState<'approve' | 'reject' | 'acknowledge' | null>(null);
 
   if (!request) return null;
+
+  const handleAcknowledge = async () => {
+    setLoading('acknowledge');
+    try {
+      const { error } = await supabase
+        .from('financial_requests')
+        .update({
+          is_acknowledged: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', request.id);
+
+      if (error) throw error;
+
+      // Silently attempt to send a notification to the requester without breaking the app
+      const { error: notifError } = await supabase.from('notifications').insert({
+        user_id: request.requester_id,
+        title: 'Request Acknowledged',
+        message: `Your financial request for "${request.purpose}" has been seen and is under review.`,
+        type: 'finance',
+        is_read: false
+      });
+
+      if (notifError) {
+        console.warn("Failed to send notification, but acknowledgement succeeded:", notifError);
+      }
+
+      toast.success("Request acknowledged successfully");
+      onComplete();
+      onClose();
+    } catch (err: any) {
+      toast.error("Failed to acknowledge request");
+      console.error(err);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleDecision = async (status: 'approved' | 'rejected') => {
     if (status === 'rejected' && !comment) {
@@ -87,6 +124,20 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, r
             <p className="text-xs text-slate-600 mt-1">{request.description}</p>
           </div>
         </div>
+
+        {/* Acknowledge Button (Only shows if pending and NOT yet acknowledged) */}
+        {request.status === 'pending' && !request.is_acknowledged && (
+          <div className="pb-4 border-b border-slate-100">
+            <Button
+              onClick={handleAcknowledge}
+              isLoading={loading === 'acknowledge'}
+              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+              variant="outline"
+            >
+              <Eye className="mr-2 h-4 w-4" /> Acknowledge Receipt
+            </Button>
+          </div>
+        )}
 
         {/* Admin Input */}
         <div>

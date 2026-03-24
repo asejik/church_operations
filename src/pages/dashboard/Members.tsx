@@ -49,8 +49,6 @@ export const MembersPage = () => {
         const { data } = await supabase.from('units').select('id, name').order('name');
         if (data && data.length > 0) {
           setUnits(data);
-          // Default to first unit if specific selection needed, or keep 'all'
-          // setSelectedUnitId(data[0].id);
         }
       } else if (profile.unit_id) {
         setSelectedUnitId(profile.unit_id);
@@ -153,6 +151,7 @@ export const MembersPage = () => {
   };
 
   const getSubunitName = (id?: number) => subunits.find(s => s.id === id)?.name || "—";
+  const getUnitName = (id?: string) => units.find(u => u.id === id)?.name || "—";
 
   return (
     <div className="space-y-6 pb-20">
@@ -309,7 +308,10 @@ export const MembersPage = () => {
                          <h3 className="font-bold text-slate-900">{member.full_name}</h3>
                          {member.role_in_unit === 'unit_head' && <Crown className="h-3 w-3 text-amber-500 fill-amber-500" />}
                        </div>
-                       <p className="text-xs text-slate-500">{getSubunitName(member.subunit_id)}</p>
+                       <p className="text-xs text-slate-500 mt-0.5">
+                          {isAdmin && selectedUnitId === 'all' && <span className="font-semibold text-amber-600 mr-1">{getUnitName(member.unit_id)} •</span>}
+                          {getSubunitName(member.subunit_id)}
+                       </p>
                      </div>
                    </div>
                    <ChevronRight className="h-5 w-5 text-slate-300" />
@@ -337,6 +339,9 @@ export const MembersPage = () => {
                         <th className="px-4 py-4 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('full_name')}>
                           <div className="flex items-center gap-1">Name <ArrowUpDown className="h-3 w-3" /></div>
                         </th>
+                        {isAdmin && selectedUnitId === 'all' && (
+                          <th className="px-4 py-4">Unit</th>
+                        )}
                         <th className="px-4 py-4">Phone</th>
                         <th className="px-4 py-4">Employment</th>
                         <th className="px-4 py-4">NYSC</th>
@@ -346,7 +351,11 @@ export const MembersPage = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {processedMembers.length === 0 ? (
-                        <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">No members found matching your filters.</td></tr>
+                        <tr>
+                          <td colSpan={isAdmin && selectedUnitId === 'all' ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
+                            No members found matching your filters.
+                          </td>
+                        </tr>
                       ) : (
                         processedMembers.map((member, index) => (
                           <tr key={member.id} onClick={() => setSelectedMember(member)} className="group hover:bg-blue-50/50 cursor-pointer transition-colors">
@@ -358,6 +367,14 @@ export const MembersPage = () => {
                                 {member.role_in_unit === 'subunit_head' && <div title="Subunit Head" className="flex items-center justify-center h-5 w-5 rounded-full bg-blue-100"><Shield className="h-3 w-3 text-blue-600 fill-blue-600" /></div>}
                               </div>
                             </td>
+
+                            {/* CONDITIONAL UNIT COLUMN */}
+                            {isAdmin && selectedUnitId === 'all' && (
+                              <td className="px-4 py-3 font-semibold text-amber-700 bg-amber-50/30">
+                                {getUnitName(member.unit_id)}
+                              </td>
+                            )}
+
                             <td className="px-4 py-3 text-slate-600">{member.phone_number || "—"}</td>
 
                             {/* EMPLOYMENT STATUS COLUMN */}

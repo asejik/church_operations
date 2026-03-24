@@ -1,10 +1,54 @@
 import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, History } from 'lucide-react';
 
 // Change this version string whenever you want the popup to appear again for everyone
-const CURRENT_VERSION = "v1.1.0";
+const CURRENT_VERSION = "v1.2.0";
+
+// Maintain the history of updates here. The component will only render the top 5.
+const CHANGELOG_DATA = [
+  {
+    version: "v1.2.0",
+    date: "March 24, 2026",
+    features: [
+      {
+        title: "Acknowledge Financial Requests",
+        description: "SMRs can now 'Acknowledge Receipt' of requests to notify unit heads before making a final approval or rejection."
+      },
+      {
+        title: "Archive Financial Records",
+        description: "Admins and SMRs can now soft-delete (archive) completed financial requests to keep the dashboard clean."
+      },
+      {
+        title: "Global Workforce Context",
+        description: "When viewing 'All Units' in the Global Workforce, a new column now displays the unit each member belongs to."
+      },
+      {
+        title: "Table Scrolling Fixes",
+        description: "Horizontal scrolling has been fixed for the SMR Finance table, preventing data from being cut off on smaller screens."
+      }
+    ]
+  },
+  {
+    version: "v1.1.0",
+    date: "March 20, 2026",
+    features: [
+      {
+        title: "Assistant Unit Head Role",
+        description: "You can now assign the 'Assistant Unit Head' role when adding or editing members."
+      },
+      {
+        title: "Urgent Financial Requests",
+        description: "You can now mark financial requests as 'URGENT' to notify Admin and SMRs immediately."
+      },
+      {
+        title: "Mobile Layout Fixes",
+        description: "The Performance page now scrolls perfectly on all mobile devices."
+      }
+    ]
+  }
+];
 
 export const ChangelogModal = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -24,32 +68,49 @@ export const ChangelogModal = () => {
     setIsOpen(false);
   };
 
+  // Enforce the 5-item limit
+  const displayLogs = CHANGELOG_DATA.slice(0, 5);
+
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="What's New in CLC Ops">
       <div className="space-y-6">
+
+        {/* Header Banner */}
         <div className="flex items-center gap-3 rounded-xl bg-blue-50 p-4 text-blue-700 border border-blue-100">
           <Sparkles className="h-6 w-6 shrink-0 text-blue-500" />
           <p className="text-sm font-medium">
-            We have been working hard to improve your experience. Here is what is new in this update!
+            We have been working hard to improve your experience. Here is what is new!
           </p>
         </div>
 
-        <div className="space-y-4">
-          {/* Add your new features here */}
-          <FeatureItem title="Assistant Unit Head Role">
-            You can now assign the "Assistant Unit Head" role when adding or editing members.
-          </FeatureItem>
+        {/* Scrollable History List */}
+        <div className="max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar space-y-8">
+          {displayLogs.map((log, index) => (
+            <div key={log.version} className={`space-y-4 ${index > 0 ? 'pt-6 border-t border-slate-100' : ''}`}>
 
-          <FeatureItem title="Urgent Financial Requests">
-            You can now mark financial requests as "URGENT" to notify approvers immediately.
-          </FeatureItem>
+              {/* Version Date Header */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-bold font-mono">
+                  <History className="h-3 w-3" /> {log.version}
+                </div>
+                <span className="text-xs text-slate-400 font-medium">{log.date}</span>
+              </div>
 
-          <FeatureItem title="Mobile Layout Fixes">
-            The Performance page now scrolls perfectly on all mobile devices.
-          </FeatureItem>
+              {/* Features List */}
+              <div className="space-y-4">
+                {log.features.map((feat, i) => (
+                  <FeatureItem key={i} title={feat.title}>
+                    {feat.description}
+                  </FeatureItem>
+                ))}
+              </div>
+
+            </div>
+          ))}
         </div>
 
-        <div className="pt-4 border-t border-slate-100">
+        {/* Footer */}
+        <div className="pt-4 border-t border-slate-100 mt-2">
           <Button onClick={handleClose} className="w-full">
             Got it, thanks!
           </Button>
