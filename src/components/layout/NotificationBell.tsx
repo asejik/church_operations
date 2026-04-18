@@ -32,7 +32,6 @@ export const NotificationBell = () => {
       // A. Unread Announcements (Hidden for Executives, relevant for everyone else)
       if (!isExecutive) {
         const { data: reads } = await supabase.from('announcement_reads').select('announcement_id').eq('user_id', profile.id);
-        const readIds = new Set(reads?.map(r => r.announcement_id));
 
         const { count: annCount } = await supabase.from('announcements').select('*', { count: 'exact', head: true });
         const totalUnread = Math.max(0, (annCount || 0) - (reads?.length || 0));
