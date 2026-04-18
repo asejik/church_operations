@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -59,7 +60,7 @@ export const SMRReports = () => {
       });
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to generate report");
     } finally {
       setLoading(false);

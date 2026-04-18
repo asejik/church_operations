@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileBottomNav } from './MobileBottomNav';
 import { Background } from './Background';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { ChangelogModal } from '@/components/ui/ChangelogModal';
@@ -24,13 +24,9 @@ export const DashboardLayout = () => {
     );
   }
 
-  // Error State
-  if (isError) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <p className="text-red-500">Failed to load profile. Please refresh.</p>
-      </div>
-    );
+  // Auth Guard: redirect to login if unauthenticated or profile fetch failed
+  if (isError || (!isLoading && !profile)) {
+    return <Navigate to="/login" replace />;
   }
 
   const isUnitPastor = profile?.role === 'unit_pastor';

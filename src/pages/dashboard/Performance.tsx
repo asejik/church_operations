@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -64,7 +65,7 @@ export const PerformancePage = () => {
       setReviews(reviewData || []);
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load performance data");
     } finally {
       setLoading(false);

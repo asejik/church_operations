@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { db } from '@/lib/db';
@@ -39,7 +40,7 @@ export const RequestsModal = ({ isOpen, onClose, onUpdate }: RequestsModalProps)
       if (error) throw error;
       setRequests(data || []);
     } catch (err: any) {
-      console.error("Fetch Error:", err);
+      logger.error("Fetch Error:", err);
       // Only toast if it's a real error, not a cancellation
       if (err.message) toast.error("Failed to load requests: " + err.message);
     } finally {

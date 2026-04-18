@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -95,7 +96,7 @@ export const MembersPage = () => {
       setSubunits(subunitData || []);
 
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load members");
     } finally {
       setLoading(false);

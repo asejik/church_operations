@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
@@ -99,7 +100,7 @@ export const EvangelismOverview = () => {
       });
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load stats");
     } finally {
       setLoading(false);

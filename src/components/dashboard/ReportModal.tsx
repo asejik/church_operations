@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -101,7 +102,7 @@ export const ReportModal = ({ isOpen, onClose }: ReportModalProps) => {
       });
 
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to generate report");
     } finally {
       setLoading(false);

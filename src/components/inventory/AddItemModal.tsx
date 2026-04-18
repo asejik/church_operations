@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -88,7 +89,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ isOpen, onClose, onS
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error(err.message || "Failed to save item");
     } finally {
       setLoading(false);

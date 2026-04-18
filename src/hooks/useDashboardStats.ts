@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -130,7 +131,7 @@ export const useDashboardStats = () => {
         }));
 
       } catch (error) {
-        console.error("Dashboard Load Error:", error);
+        logger.error("Dashboard Load Error:", error);
       } finally {
         setLoading(false);
       }

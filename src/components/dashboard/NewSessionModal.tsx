@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Modal } from '@/components/ui/Modal';
@@ -136,7 +137,7 @@ export const NewSessionModal = ({
       onClose();
 
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to save: " + err.message);
     } finally {
       setLoading(false);

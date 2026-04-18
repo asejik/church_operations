@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, ExternalLink, Megaphone, Inbox } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -57,7 +58,7 @@ export const NotificationBell = () => {
       setNotifications(notifs || []);
 
     } catch (err) {
-      console.error("Notif Error", err);
+      logger.error("Notif Error", err);
     }
   };
 

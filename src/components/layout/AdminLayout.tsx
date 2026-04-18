@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { NotificationBell } from './NotificationBell';
@@ -47,8 +47,8 @@ const AdminProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boo
       toast.error("Passwords do not match");
       return;
     }
-    if (passwords.new.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (passwords.new.length < 12) {
+      toast.error("Password must be at least 12 characters");
       return;
     }
     setLoading(true);
@@ -105,13 +105,18 @@ const AdminProfileModal = ({ isOpen, onClose, profile, onUpdate }: { isOpen: boo
 };
 
 export const AdminLayout = () => {
-  const { data: profile, refetch } = useProfile();
+  const { data: profile, isLoading, refetch } = useProfile();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Auth + Role Guard
+  if (!isLoading && (!profile || profile.role !== 'admin_pastor')) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

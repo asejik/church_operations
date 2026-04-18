@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -60,7 +61,7 @@ export const AddMemberModal = ({ isOpen, onClose, onSuccess }: AddMemberModalPro
       onClose();
       setFormData({ full_name: '', phone_number: '', gender: 'male', role_in_unit: 'member', employment_status: [], nysc_status: '' });
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to add member: " + err.message);
     } finally {
       setLoading(false);

@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
@@ -120,7 +121,7 @@ export const SessionEditor = ({ isOpen, onClose, existingSessionId, onSaveComple
       if (onSaveComplete) onSaveComplete();
       onClose();
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to sync. Check internet connection.");
     } finally {
       setLoading(false);

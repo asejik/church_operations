@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -51,7 +52,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, r
       onClose();
     } catch (err: any) {
       toast.error("Failed to acknowledge request");
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoading(null);
     }
@@ -89,7 +90,7 @@ export const DecisionModal: React.FC<DecisionModalProps> = ({ isOpen, onClose, r
       setComment('');
     } catch (err: any) {
       toast.error("Failed to update request");
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoading(null);
     }

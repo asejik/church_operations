@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -38,7 +39,7 @@ export const SettingsPage = () => {
 
       toast.success("Profile updated successfully");
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to update profile");
     } finally {
       setLoading(false);

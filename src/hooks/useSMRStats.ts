@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, subMonths, startOfYear, format } from 'date-fns';
@@ -59,9 +60,10 @@ export const useSMRStats = () => {
       // 2. WORKFORCE FETCH
       const { data: members, error: memberError } = await supabase
         .from('members')
-        .select('*');
+        .select('id, unit_id, gender, marital_status, joined_at, ces_status, employment_status, nysc_status');
 
-      if (memberError) console.error("Workforce Error:", memberError);
+
+      if (memberError) logger.error("Workforce Error:", memberError);
 
       const total = members?.length || 0;
       const joinedMonth = members?.filter(m => m.joined_at && m.joined_at >= firstDayMonth).length || 0;
@@ -239,7 +241,7 @@ export const useSMRStats = () => {
       });
 
     } catch (err) {
-      console.error("Dashboard Stats Error:", err);
+      logger.error("Dashboard Stats Error:", err);
     } finally {
       setLoading(false);
     }

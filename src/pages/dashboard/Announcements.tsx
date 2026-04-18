@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -52,7 +53,7 @@ export const AnnouncementsPage = () => {
       setAnnouncements(annData || []);
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load announcements");
     } finally {
       setLoading(false);
@@ -85,7 +86,7 @@ export const AnnouncementsPage = () => {
         user_id: profile?.id
       });
     } catch (err) {
-      console.error("Failed to mark read", err);
+      logger.error("Failed to mark read", err);
     }
   };
 
@@ -213,6 +214,9 @@ export const AnnouncementsPage = () => {
                </div>
             </div>
 
+            {/* SECURITY: Content is rendered as plain text by React (safe — no XSS risk).
+                 If this is ever changed to support rich text / dangerouslySetInnerHTML,
+                 sanitize first: DOMPurify.sanitize(content) — see Finding F7 in security audit. */}
             <div className="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap leading-relaxed">
               {selectedAnnouncement.content}
             </div>

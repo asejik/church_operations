@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '@/lib/supabase';
@@ -119,7 +120,7 @@ export const BatchUploadModal: React.FC<BatchUploadModalProps> = ({ isOpen, onCl
           const { error } = await supabase.from('members').insert(memberData);
 
           if (error) {
-            console.error("Row failed:", rawName, error);
+            logger.error("Row failed:", rawName, error);
             // Log the specific database error to the UI
             setLogs(prev => [...prev, `❌ Error adding ${rawName}: ${error.message}`]);
             failCount++;
@@ -140,7 +141,7 @@ export const BatchUploadModal: React.FC<BatchUploadModalProps> = ({ isOpen, onCl
       },
       error: (err) => {
         setLoading(false);
-        console.error("CSV Parse Error:", err);
+        logger.error("CSV Parse Error:", err);
         toast.error("Failed to read file.");
       }
     });

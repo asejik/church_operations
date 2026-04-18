@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -37,7 +38,7 @@ export const SoulsPage = () => {
       setRecords(data || []);
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load soul reports");
     } finally {
       setLoading(false);

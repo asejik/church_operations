@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -26,7 +27,7 @@ export const RequestsTab = () => {
       if (error) throw error;
       setRequests(data || []);
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load requests");
     } finally {
       setLoading(false);

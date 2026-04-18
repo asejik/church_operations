@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/hooks/useProfile';
@@ -97,7 +98,7 @@ export const AttendancePage = () => {
       setAttendanceLogs(logsData || []);
 
     } catch (err) {
-      console.error(err);
+      logger.error(err);
       toast.error("Failed to load attendance");
     } finally {
       setDataLoading(false);
