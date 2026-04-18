@@ -34,8 +34,8 @@ export const NotificationBell = () => {
         const { data: reads } = await supabase.from('announcement_reads').select('announcement_id').eq('user_id', profile.id);
         const readIds = new Set(reads?.map(r => r.announcement_id));
 
-        const { data: allAnnouncements } = await supabase.from('announcements').select('id');
-        const totalUnread = (allAnnouncements || []).filter(a => !readIds.has(a.id)).length;
+        const { count: annCount } = await supabase.from('announcements').select('*', { count: 'exact', head: true });
+        const totalUnread = Math.max(0, (annCount || 0) - (reads?.length || 0));
         setUnreadAnnouncements(totalUnread);
       } else {
         setUnreadAnnouncements(0);

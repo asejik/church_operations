@@ -1,7 +1,7 @@
 import { logger } from '@/lib/logger';
-import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, subMonths, startOfYear, format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
 
 export interface SMRStats {
   workforce: {
@@ -38,15 +38,9 @@ export interface SMRStats {
 }
 
 export const useSMRStats = () => {
-  const [stats, setStats] = useState<SMRStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
+  const query = useQuery({
+    queryKey: ['smr-stats'],
+    queryFn: async (): Promise<SMRStats> => {
       const now = new Date();
       const firstDayMonth = startOfMonth(now).toISOString();
       const firstDayYear = startOfYear(now).toISOString();
@@ -57,11 +51,10 @@ export const useSMRStats = () => {
       const unitLookup = new Map<string, string>();
       unitsData?.forEach(u => unitLookup.set(u.id, u.name));
 
-      // 2. WORKFORCE FETCH
+      // 2. WORKFORCE FETCH - SELECTIVE COLUMNS
       const { data: members, error: memberError } = await supabase
         .from('members')
         .select('id, unit_id, gender, marital_status, joined_at, ces_status, employment_status, nysc_status');
-
 
       if (memberError) logger.error("Workforce Error:", memberError);
 
@@ -95,10 +88,10 @@ export const useSMRStats = () => {
           if (m.nysc_status === 'Ongoing' || statusStr.includes('NYSC')) nysc++;
       });
 
-      // 3. ATTENDANCE FETCH
+      // 3. ATTENDANCE FETCH - SELECTIVE COLUMNS
       const { data: attendanceData } = await supabase
         .from('attendance')
-        .select('*, events!inner(event_type)')
+        .select('status, reason, event_date, events!inner(event_type)')
         .gte('event_date', threeMonthsAgo);
 
       let sundayCount = 0;
@@ -141,18 +134,13 @@ export const useSMRStats = () => {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
-      // 4. FINANCE FETCH
+      // 4. FINANCE FETCH - SELECTIVE COLUMNS
       const { data: expenses } = await supabase
         .from('financial_requests')
-        .select('*')
+        .select('status, amount, unit_id, is_archived, created_at')
         .gte('created_at', firstDayMonth);
 
-      // CRITICAL FIX: Ignore archived requests from the pending count
-      const { count: pendingCount } = await supabase
-        .from('financial_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .eq('is_archived', false);
+      const pendingCount = expenses?.filter(e => e.status === 'pending' && !e.is_archived).length || 0;
 
       const spendMap = new Map();
       expenses?.filter(e => e.status === 'approved' || e.status === 'paid').forEach((e: any) => {
@@ -160,10 +148,10 @@ export const useSMRStats = () => {
         spendMap.set(uName, (spendMap.get(uName) || 0) + e.amount);
       });
 
-      // 5. SOULS FETCH
+      // 5. SOULS FETCH - SELECTIVE COLUMNS
       const { data: souls } = await supabase
         .from('soul_reports')
-        .select('*')
+        .select('soul_winner_name, unit_id, report_date')
         .gte('report_date', firstDayYear);
 
       const soulsMonth = souls?.filter(s => s.report_date >= firstDayMonth).length || 0;
@@ -178,10 +166,10 @@ export const useSMRStats = () => {
         unitSoulMap.set(uName, (unitSoulMap.get(uName) || 0) + 1);
       });
 
-      // 6. PERFORMANCE
+      // 6. PERFORMANCE REVIEW - SELECTIVE COLUMNS
       const { data: reviews } = await supabase
         .from('performance_reviews')
-        .select('*')
+        .select('member_id, unit_id, rating_commitment, rating_spiritual')
         .limit(20);
 
       const memberIds = reviews?.map(r => r.member_id) || [];
@@ -207,8 +195,7 @@ export const useSMRStats = () => {
         };
       }).filter(Boolean).slice(0, 5) || [];
 
-      // SET STATE
-      setStats({
+      return {
         workforce: {
           total, joinedMonth, joinedYear,
           cesRatio: total ? Math.round((cesComplete / total) * 100) : 0,
@@ -227,7 +214,7 @@ export const useSMRStats = () => {
         },
         finance: {
           spendingByUnit: Array.from(spendMap).map(([name, value]) => ({ name, value: value as number })),
-          pendingCount: pendingCount || 0,
+          pendingCount: pendingCount,
         },
         souls: {
           month: soulsMonth,
@@ -238,14 +225,15 @@ export const useSMRStats = () => {
         performance: {
           lowPerformers: lowPerformers as any[]
         }
-      });
+      };
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    retry: 1,
+  });
 
-    } catch (err) {
-      logger.error("Dashboard Stats Error:", err);
-    } finally {
-      setLoading(false);
-    }
+  return { 
+    stats: query.data || null, 
+    loading: query.isLoading, 
+    refresh: query.refetch 
   };
-
-  return { stats, loading, refresh: fetchStats };
 };

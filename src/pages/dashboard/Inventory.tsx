@@ -35,7 +35,13 @@ export const InventoryPage = () => {
     if (!profile) return;
     setLoading(true);
     try {
-      let query = supabase.from('inventory').select('*, units(name)');
+      let query = supabase
+        .from('inventory')
+        .select(`
+          id, item_name, quantity, condition, date_purchased, notes, unit_id, created_at,
+          units(name)
+        `)
+        .limit(50);
 
       // Admins see all units (or filtered unit), Unit Heads see own unit
       if (!isAdmin) {

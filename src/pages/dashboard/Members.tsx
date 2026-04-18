@@ -66,8 +66,14 @@ export const MembersPage = () => {
       // Build Query for Members
       let memberQuery = supabase
         .from('members')
-        .select('*')
-        .order('full_name');
+        .select(`
+          id, unit_id, full_name, category, image_url, email, phone_number,
+          gender, dob, marital_status, joined_clc, joined_workforce,
+          attended_membership_class, completed_ces, subunit_id, role_in_unit,
+          employment_status, nysc_status
+        `)
+        .order('full_name')
+        .limit(100);
 
       // Apply Unit Filter
       if (isAdmin) {

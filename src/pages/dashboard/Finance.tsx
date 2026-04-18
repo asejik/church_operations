@@ -36,18 +36,20 @@ export const FinancePage = () => {
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
-          *,
+          id, amount, purpose, status, created_at, unit_id, requester_id, reviewed_by, is_archived,
           units(name),
           profiles:requester_id(full_name),
           reviewer:reviewed_by(full_name, role)
         `)
-        .eq('is_archived', false);
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (!isAdmin) {
         reqQuery = reqQuery.eq('unit_id', profile.unit_id);
       }
 
-      const { data: reqData, error } = await reqQuery.order('created_at', { ascending: false });
+      const { data: reqData, error } = await reqQuery;
       if (error) throw error;
       setRequests(reqData || []);
 

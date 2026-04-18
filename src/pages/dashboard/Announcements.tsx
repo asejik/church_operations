@@ -32,13 +32,14 @@ export const AnnouncementsPage = () => {
     setLoading(true);
     try {
       // 1. Fetch Announcements
-      const { data: annData, error } = await supabase
+       const { data: annData, error } = await supabase
         .from('announcements')
         .select(`
-          *,
+          id, title, content, created_at, created_by,
           author:profiles!announcements_created_by_fkey(full_name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 
