@@ -30,7 +30,7 @@ export const useDashboardStats = () => {
       // 1. Fetch Unit Profile - SELECTIVE
       const { data: unitProfile } = await supabase
         .from('units')
-        .select('id, name, zone')
+        .select('id, name')
         .eq('id', unitId)
         .single();
 
