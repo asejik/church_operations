@@ -5,14 +5,18 @@ import { useProfile } from '@/hooks/useProfile';
 import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Added prop interface
 export const Sidebar = ({ onMobileClick }: { onMobileClick?: () => void }) => {
   const navigate = useNavigate();
   const { data: profile } = useProfile();
 
+  const queryClient = useQueryClient();
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
     navigate('/login');
   };
 

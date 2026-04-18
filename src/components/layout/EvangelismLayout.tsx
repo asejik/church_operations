@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabase';
 import { NotificationBell } from './NotificationBell';
@@ -118,8 +119,11 @@ export const EvangelismLayout = () => {
     return <Navigate to="/login" replace />;
   }
 
+  const queryClient = useQueryClient();
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    queryClient.clear();
     navigate('/login');
   };
 

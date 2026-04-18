@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -35,6 +36,10 @@ export const LoginPage = () => {
         .select('role')
         .eq('id', authData.user.id)
         .single();
+
+      // NEW: Clear Query Cache after successful login to prevent state leakage
+      const queryClient = useQueryClient();
+      queryClient.clear();
 
       // 3. Smart Redirect
       if (profile?.role === 'smr') {
