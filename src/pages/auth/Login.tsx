@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -37,8 +38,7 @@ export const LoginPage = () => {
         .eq('id', authData.user.id)
         .single();
 
-      // NEW: Clear Query Cache after successful login to prevent state leakage
-      const queryClient = useQueryClient();
+      // Clear Query Cache after successful login to prevent state leakage
       queryClient.clear();
 
       // 3. Smart Redirect
