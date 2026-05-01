@@ -36,7 +36,8 @@ export const FinancePage = () => {
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
-          id, amount, purpose, status, created_at, unit_id, requester_id, reviewed_by, is_archived,
+          id, amount, purpose, description, status, created_at, unit_id, requester_id, reviewed_by, is_archived,
+          admin_comment, is_acknowledged, is_urgent, receipt_url,
           units(name),
           profiles:requester_id(full_name),
           reviewer:reviewed_by(full_name, role)
