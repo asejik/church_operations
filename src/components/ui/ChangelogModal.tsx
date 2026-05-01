@@ -4,10 +4,20 @@ import { Button } from './Button';
 import { Sparkles, CheckCircle2, History } from 'lucide-react';
 
 // Change this version string whenever you want the popup to appear again for everyone
-const CURRENT_VERSION = "v1.2.0";
+const CURRENT_VERSION = "v1.3.0";
 
 // Maintain the history of updates here. The component will only render the top 5.
 const CHANGELOG_DATA = [
+  {
+    version: "v1.3.0",
+    date: "May 1, 2026",
+    features: [
+      {
+        title: "Financial Request Details Fix",
+        description: "Fixed a bug where the 'Details' column in the Financial Requests table was appearing empty. We've also added fallback support for older records."
+      }
+    ]
+  },
   {
     version: "v1.2.0",
     date: "March 24, 2026",
