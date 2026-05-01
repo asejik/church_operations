@@ -36,7 +36,7 @@ export const FinancePage = () => {
       let reqQuery = supabase
         .from('financial_requests')
         .select(`
-          id, amount, purpose, description, status, created_at, unit_id, requester_id, reviewed_by, is_archived,
+          id, amount, purpose, title, notes, description, reason, status, created_at, unit_id, requester_id, reviewed_by, is_archived,
           admin_comment, is_acknowledged, is_urgent, receipt_url,
           units(name),
           profiles:requester_id(full_name),
@@ -339,8 +339,8 @@ export const FinancePage = () => {
                         {req.purpose || req.title}
                       </td>
 
-                      <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[250px]" title={req.description}>
-                        <div className="truncate mb-1">{req.description || "—"}</div>
+                      <td className="px-4 py-3 text-slate-500 text-xs border-r border-slate-100 max-w-[250px]" title={req.description || req.notes || req.reason || req.title}>
+                        <div className="truncate mb-1">{req.description || req.notes || req.reason || req.title || "—"}</div>
                         {req.admin_comment && (
                           <div className="mt-1 flex items-start gap-1 bg-amber-50 border border-amber-100 p-1.5 rounded-md text-[10px] text-amber-800">
                               <MessageSquare className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
